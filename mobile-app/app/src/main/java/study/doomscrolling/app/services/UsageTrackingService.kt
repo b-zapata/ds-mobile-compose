@@ -25,6 +25,7 @@ class UsageTrackingService : Service() {
 
     private val detector by lazy { ForegroundAppDetector(this) }
     private var currentSession: Session? = null
+    private var mismatchCount: Int = 0
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -81,14 +82,29 @@ class UsageTrackingService : Service() {
                 try {
                     if (!ForegroundAppDetector.hasUsageStatsPermission(this)) break
                     val foreground = detector.getCurrentForegroundPackage()
-                    if (MonitoredApps.isMonitored(foreground)) {
-                        val pkg = foreground!!
-                        if (currentSession == null || currentSession!!.packageName != pkg) {
-                            endSession()
-                            startSession(pkg)
+                    val session = currentSession
+                    when {
+                        foreground == null -> { /* ignore transient detection */ }
+                        foreground == session?.packageName -> {
+                            mismatchCount = 0
+                            if (MonitoredApps.isMonitored(foreground) && (session == null || session.packageName != foreground)) {
+                                endSession()
+                                startSession(foreground)
+                            }
                         }
-                    } else {
-                        if (currentSession != null) endSession()
+                        foreground in SYSTEM_PACKAGES -> { /* ignore system overlays */ }
+                        MonitoredApps.isMonitored(foreground) -> {
+                            endSession()
+                            startSession(foreground)
+                            mismatchCount = 0
+                        }
+                        else -> {
+                            mismatchCount++
+                            if (mismatchCount >= MISMATCH_THRESHOLD) {
+                                endSession()
+                                mismatchCount = 0
+                            }
+                        }
                     }
                 } catch (e: Exception) {
                     Log.e(TAG, "Tracking loop error", e)
@@ -116,6 +132,15 @@ class UsageTrackingService : Service() {
         private const val CHANNEL_ID = "usage_tracking"
         private const val NOTIFICATION_ID = 1
         private const val POLL_INTERVAL_MS = 2000L
+        /** Consecutive polls the foreground must differ from session before ending (avoids activity transition glitches). */
+        private const val MISMATCH_THRESHOLD = 3
+
+        /** System/overlay packages to ignore so sessions don't end on permission dialogs, notification shade, etc. Launcher excluded so going home can end session after 3 cycles. */
+        private val SYSTEM_PACKAGES = setOf(
+            "com.android.systemui",
+            "com.google.android.permissioncontroller",
+            "com.android.settings"
+        )
 
         const val ACTION_START = "study.doomscrolling.app.START_USAGE_TRACKING"
     }

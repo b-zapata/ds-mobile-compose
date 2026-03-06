@@ -3,7 +3,6 @@ package study.doomscrolling.app.services
 import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
 import android.content.Context
-import android.os.Build
 import study.doomscrolling.app.domain.MonitoredApps
 
 /**
@@ -23,8 +22,7 @@ class ForegroundAppDetector(private val context: Context) {
     fun getCurrentForegroundPackage(): String? {
         val manager = usageStatsManager ?: return null
         val now = System.currentTimeMillis()
-        val windowMs = 10_000L // last 10 seconds of events
-        val start = now - windowMs
+        val start = now - QUERY_WINDOW_MS
 
         val usageEvents = manager.queryEvents(start, now) ?: return null
         var lastResumedPackage: String? = null
@@ -44,6 +42,9 @@ class ForegroundAppDetector(private val context: Context) {
     }
 
     companion object {
+        /** UsageEvents query window (10s) to reduce batching/transition noise. */
+        private const val QUERY_WINDOW_MS = 10_000L
+
         /**
          * Returns true if this app has been granted usage stats access (Settings → Usage access).
          */
