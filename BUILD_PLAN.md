@@ -10,7 +10,7 @@ system sequentially following the phases below.
 
 Each phase should be completed and verified before moving to the next.
 
-------------------------------------------------------------------------
+---
 
 # Phase 1 --- Repository Setup
 
@@ -18,7 +18,7 @@ Create the base project structure.
 
 Repository structure:
 
-doomscrolling-study/ │ ├── SYSTEM_ARCHITECTURE.md ├── BUILD_PLAN.md │
+ds-mobile-compose/ │ ├── SYSTEM_ARCHITECTURE.md ├── BUILD_PLAN.md │
 ├── mobile-app/ ├── server/ ├── infrastructure/ └── prompts/
 
 Tasks:
@@ -33,7 +33,7 @@ Deliverable:
 
 Working project skeleton.
 
-------------------------------------------------------------------------
+---
 
 # Phase 2 --- Android Project Skeleton
 
@@ -53,7 +53,7 @@ Deliverable:
 
 App launches successfully with empty screens.
 
-------------------------------------------------------------------------
+---
 
 # Phase 3 --- Usage Tracking Engine
 
@@ -70,7 +70,7 @@ Deliverable:
 
 System logs foreground sessions for monitored apps.
 
-------------------------------------------------------------------------
+---
 
 # Phase 4 --- Session Detection
 
@@ -94,7 +94,7 @@ Deliverable:
 
 Sessions correctly recorded locally.
 
-------------------------------------------------------------------------
+---
 
 # Phase 5 --- Intervention Engine
 
@@ -116,7 +116,7 @@ Deliverable:
 
 Intervention triggers during active sessions.
 
-------------------------------------------------------------------------
+---
 
 # Phase 6 --- Intervention UI
 
@@ -132,7 +132,7 @@ Deliverable:
 
 Working intervention interface.
 
-------------------------------------------------------------------------
+---
 
 # Phase 7 --- Onboarding Module
 
@@ -154,7 +154,7 @@ Deliverable:
 
 Participants complete onboarding flow.
 
-------------------------------------------------------------------------
+---
 
 # Phase 8 --- Prompt Engine
 
@@ -169,7 +169,7 @@ Deliverable:
 
 Prompts display correctly.
 
-------------------------------------------------------------------------
+---
 
 # Phase 9 --- Local Database
 
@@ -190,7 +190,7 @@ Deliverable:
 
 Local persistence working.
 
-------------------------------------------------------------------------
+---
 
 # Phase 10 --- Nightly Upload Worker
 
@@ -205,7 +205,7 @@ Deliverable:
 
 Mobile app uploads data automatically.
 
-------------------------------------------------------------------------
+---
 
 # Phase 11 --- Backend Ingestion API
 
@@ -224,7 +224,7 @@ Deliverable:
 
 Server accepts upload requests.
 
-------------------------------------------------------------------------
+---
 
 # Phase 12 --- Database Schema
 
@@ -243,7 +243,7 @@ Deliverable:
 
 Production-ready database.
 
-------------------------------------------------------------------------
+---
 
 # Phase 13 --- End-to-End Integration
 
@@ -259,7 +259,7 @@ Deliverable:
 
 Complete working system.
 
-------------------------------------------------------------------------
+---
 
 # Phase 14 --- Research Testing
 
@@ -274,7 +274,7 @@ Deliverable:
 
 System ready for participant deployment.
 
-------------------------------------------------------------------------
+---
 
 # Implementation Notes
 
