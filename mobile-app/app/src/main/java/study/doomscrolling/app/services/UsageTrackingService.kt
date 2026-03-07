@@ -16,6 +16,8 @@ import study.doomscrolling.app.data.database.AppDatabase
 import study.doomscrolling.app.data.repository.SessionRepository
 import study.doomscrolling.app.domain.MonitoredApps
 import study.doomscrolling.app.domain.intervention.InterventionEngine
+import study.doomscrolling.app.domain.prompts.PromptManager
+import study.doomscrolling.app.domain.prompts.PromptRepository
 import study.doomscrolling.app.domain.models.Session
 import study.doomscrolling.app.domain.models.createSession
 import study.doomscrolling.app.ui.MainActivity
@@ -32,9 +34,11 @@ class UsageTrackingService : Service() {
         val db = AppDatabase.getInstance(applicationContext)
         SessionRepository(db.sessionDao(), db.deviceDao())
     }
+    private val promptRepository by lazy { PromptRepository() }
+    private val promptManager by lazy { PromptManager(applicationContext, promptRepository) }
     private val interventionEngine by lazy {
         val db = AppDatabase.getInstance(applicationContext)
-        InterventionEngine(repository, db.interventionDao())
+        InterventionEngine(repository, db.interventionDao(), promptRepository, promptManager)
     }
     private var currentSession: Session? = null
     private var mismatchCount: Int = 0

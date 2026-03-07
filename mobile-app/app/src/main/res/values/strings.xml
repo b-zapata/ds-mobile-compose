@@ -4,4 +4,7 @@
     <string name="notification_channel_usage_name">Usage tracking</string>
     <string name="notification_usage_title">Doomscrolling Study</string>
     <string name="notification_usage_text">Tracking app usage for research</string>
+    <string name="notification_channel_overlay_name">Prompt overlay</string>
+    <string name="notification_overlay_title">Doomscrolling Study</string>
+    <string name="notification_overlay_text">Intervention prompt</string>
 </resources>

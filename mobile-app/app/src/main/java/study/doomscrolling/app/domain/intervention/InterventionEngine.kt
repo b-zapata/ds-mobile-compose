@@ -8,15 +8,19 @@ import kotlinx.coroutines.launch
 import study.doomscrolling.app.data.dao.InterventionDao
 import study.doomscrolling.app.data.entities.InterventionEntity
 import study.doomscrolling.app.data.repository.SessionRepository
+import study.doomscrolling.app.domain.prompts.PromptManager
+import study.doomscrolling.app.domain.prompts.PromptRepository
 import java.util.UUID
 
 /**
- * Schedules intervention checkpoints during an active session and persists
- * intervention events. Does not show UI (Phase 6).
+ * Schedules intervention checkpoints during an active session, persists
+ * intervention events, and shows the prompt overlay when configured.
  */
 class InterventionEngine(
     private val sessionRepository: SessionRepository,
-    private val interventionDao: InterventionDao
+    private val interventionDao: InterventionDao,
+    private val promptRepository: PromptRepository,
+    private val promptManager: PromptManager
 ) {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -63,6 +67,9 @@ class InterventionEngine(
             )
         interventionDao.insertIntervention(entity)
         Log.i(TAG, "Intervention triggered" + (checkpointMinutes?.let { " at checkpoint $it minutes" } ?: ""))
+        val prompt = promptRepository.getRandomPrompt()
+        Log.i(TAG, "Prompt selected")
+        promptManager.showPrompt(prompt)
     }
 
     companion object {

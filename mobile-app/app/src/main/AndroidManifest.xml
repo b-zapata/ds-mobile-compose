@@ -9,6 +9,7 @@
 
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
     <application
         android:name=".DoomscrollingApplication"
@@ -40,5 +41,14 @@
                 android:value="Usage tracking for research study: detects when monitored social media apps are in foreground." />
         </service>
 
+        <service
+            android:name=".ui.overlay.OverlayService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Shows intervention prompt overlay over other apps." />
+        </service>
     </application>
 </manifest>
