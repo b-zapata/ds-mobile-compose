@@ -10,7 +10,10 @@ import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import kotlinx.coroutines.runBlocking
 import study.doomscrolling.app.R
+import study.doomscrolling.app.data.database.AppDatabase
+import study.doomscrolling.app.data.repository.SessionRepository
 import study.doomscrolling.app.domain.MonitoredApps
 import study.doomscrolling.app.domain.models.Session
 import study.doomscrolling.app.domain.models.createSession
@@ -24,6 +27,10 @@ import study.doomscrolling.app.ui.MainActivity
 class UsageTrackingService : Service() {
 
     private val detector by lazy { ForegroundAppDetector(this) }
+    private val repository by lazy {
+        val db = AppDatabase.getInstance(applicationContext)
+        SessionRepository(db.sessionDao(), db.deviceDao())
+    }
     private var currentSession: Session? = null
     private var mismatchCount: Int = 0
 
@@ -116,12 +123,14 @@ class UsageTrackingService : Service() {
 
     private fun startSession(packageName: String) {
         val now = System.currentTimeMillis()
-        currentSession = createSession(packageName, now)
+        val sessionId = runBlocking { repository.startSession(packageName) }
+        currentSession = createSession(sessionId, packageName, now)
         Log.i(TAG, "Session started: ${MonitoredApps.displayName(packageName)}")
     }
 
     private fun endSession() {
         val session = currentSession ?: return
+        runBlocking { repository.endSession(session.sessionId) }
         session.end(System.currentTimeMillis())
         Log.i(TAG, "Session ended: duration=${session.durationSeconds}s")
         currentSession = null

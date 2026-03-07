@@ -25,3 +25,11 @@ fun createSession(packageName: String, startTimestamp: Long): Session =
         packageName = packageName,
         startTimestamp = startTimestamp
     )
+
+/** Create session with a known sessionId (e.g. from SessionRepository). */
+fun createSession(sessionId: String, packageName: String, startTimestamp: Long): Session =
+    Session(
+        sessionId = sessionId,
+        packageName = packageName,
+        startTimestamp = startTimestamp
+    )
