@@ -15,6 +15,7 @@ import study.doomscrolling.app.R
 import study.doomscrolling.app.data.database.AppDatabase
 import study.doomscrolling.app.data.repository.SessionRepository
 import study.doomscrolling.app.domain.MonitoredApps
+import study.doomscrolling.app.domain.intervention.InterventionEngine
 import study.doomscrolling.app.domain.models.Session
 import study.doomscrolling.app.domain.models.createSession
 import study.doomscrolling.app.ui.MainActivity
@@ -30,6 +31,10 @@ class UsageTrackingService : Service() {
     private val repository by lazy {
         val db = AppDatabase.getInstance(applicationContext)
         SessionRepository(db.sessionDao(), db.deviceDao())
+    }
+    private val interventionEngine by lazy {
+        val db = AppDatabase.getInstance(applicationContext)
+        InterventionEngine(repository, db.interventionDao())
     }
     private var currentSession: Session? = null
     private var mismatchCount: Int = 0
@@ -125,11 +130,13 @@ class UsageTrackingService : Service() {
         val now = System.currentTimeMillis()
         val sessionId = runBlocking { repository.startSession(packageName) }
         currentSession = createSession(sessionId, packageName, now)
+        interventionEngine.startMonitoring(sessionId, packageName, now)
         Log.i(TAG, "Session started: ${MonitoredApps.displayName(packageName)}")
     }
 
     private fun endSession() {
         val session = currentSession ?: return
+        interventionEngine.stopMonitoring()
         runBlocking { repository.endSession(session.sessionId) }
         session.end(System.currentTimeMillis())
         Log.i(TAG, "Session ended: duration=${session.durationSeconds}s")

@@ -37,6 +37,12 @@ class SessionRepository(
     }
 
     /**
+     * Returns the session if it exists and is still active (endTimestamp == null).
+     */
+    suspend fun getActiveSession(sessionId: String): SessionEntity? =
+        sessionDao.getActiveSession(sessionId)?.takeIf { it.endTimestamp == null }
+
+    /**
      * Update endTimestamp and durationSeconds for the given session.
      */
     suspend fun endSession(sessionId: String) {
