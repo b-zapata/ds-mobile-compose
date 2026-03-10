@@ -1,0 +1,75 @@
+{
+  "identity": {
+    "0": [
+      "Take a breath and remember [Trait 1]. Is this scroll aligned with that part of you?",
+      "Think about [Goal 1]. Does staying here help you move toward it?"
+    ],
+    "10": [
+      "You've been here for a while. Someone with [Trait 2] might choose differently right now.",
+      "If you lived fully as [Role 1] today, what would you do next instead of scrolling?"
+    ],
+    "15": [
+      "Picture the version of you who truly embodies [Trait 3]. What would they do now?",
+      "Is this helping you be the kind of [Role 2] you want to be?"
+    ],
+    "20": [
+      "Long scrolls can pull you away from [Goal 2]. Is there a small step toward it you can take now?",
+      "Imagine looking back tonight as [Role 3]. How do you wish you had spent this time?"
+    ]
+  },
+  "mindfulness": {
+    "0": [
+      "Notice your body. Where do you feel [Stress 1] right now?",
+      "Gently bring your attention to your [Breath]. Follow three full inhales and exhales."
+    ],
+    "10": [
+      "Imagine you are in your calming place: [Place]. Let that scene fill your mind for a few moments.",
+      "Visualize your [Mental Color] slowly filling the screen and softening your attention."
+    ],
+    "15": [
+      "Pause and feel one simple sensation: [Tactile Recall]. Stay with it for three breaths.",
+      "Notice the pull to keep scrolling. Can you rest your attention on your body instead, just for a moment?"
+    ],
+    "20": [
+      "Feel the weight of your body as a [Gravity Anchor] holding you in place, not the feed.",
+      "Bring awareness to [Limb Symmetry]—how both sides of your body rest right now."
+    ]
+  },
+  "friction": {
+    "0": [
+      "Before you continue, trace the shape of an imaginary square slowly in the air with your finger.",
+      "Type the word \"PAUSE\" slowly in your mind, one letter at a time."
+    ],
+    "10": [
+      "Press your thumb and finger together ten times, counting each press before you scroll again.",
+      "Move your attention from your toes up to your head, naming each body part before continuing."
+    ],
+    "15": [
+      "Imagine tensing and then relaxing a distant muscle: [Distant Muscle]. Notice the shift before moving on.",
+      "Close your eyes for ten slow heartbeats before deciding what to tap next."
+    ],
+    "20": [
+      "Slowly breathe in for four counts, hold for four, and out for six before choosing to keep or stop scrolling.",
+      "Set a simple rule: after this message, either switch apps or put the phone down for one minute."
+    ]
+  },
+  "blank": {
+    "0": [
+      "Take a brief pause. Do you want to keep scrolling right now?",
+      "Notice how you feel in this moment before continuing."
+    ],
+    "10": [
+      "You’ve been here for a while. Is this how you want to spend the next few minutes?",
+      "Check in: Are you scrolling with intention or out of habit?"
+    ],
+    "15": [
+      "Imagine what else you could do with the next 10 minutes. Does anything sound better than this feed?",
+      "Would a short break from the screen feel helpful right now?"
+    ],
+    "20": [
+      "Long sessions can blur together. Is now a good time to step away for a bit?",
+      "If you paused now, what small, restful action could you take instead?"
+    ]
+  }
+}
+

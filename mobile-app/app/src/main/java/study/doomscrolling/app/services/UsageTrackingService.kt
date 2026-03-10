@@ -13,13 +13,17 @@ import androidx.core.app.NotificationCompat
 import kotlinx.coroutines.runBlocking
 import study.doomscrolling.app.R
 import study.doomscrolling.app.data.database.AppDatabase
+import study.doomscrolling.app.data.prompts.PromptRepository
 import study.doomscrolling.app.data.repository.SessionRepository
 import study.doomscrolling.app.domain.MonitoredApps
+import study.doomscrolling.app.domain.intervention.InterventionCompletionNotifier
 import study.doomscrolling.app.domain.intervention.InterventionEngine
+import study.doomscrolling.app.domain.prompts.PromptEngine
 import study.doomscrolling.app.domain.prompts.PromptManager
-import study.doomscrolling.app.domain.prompts.PromptRepository
+import study.doomscrolling.app.domain.prompts.PromptRenderer
 import study.doomscrolling.app.domain.models.Session
 import study.doomscrolling.app.domain.models.createSession
+import study.doomscrolling.app.domain.study.StudyArmManager
 import study.doomscrolling.app.ui.MainActivity
 
 /**
@@ -30,15 +34,19 @@ import study.doomscrolling.app.ui.MainActivity
 class UsageTrackingService : Service() {
 
     private val detector by lazy { ForegroundAppDetector(this) }
-    private val repository by lazy {
-        val db = AppDatabase.getInstance(applicationContext)
-        SessionRepository(db.sessionDao(), db.deviceDao())
-    }
-    private val promptRepository by lazy { PromptRepository() }
-    private val promptManager by lazy { PromptManager(applicationContext, promptRepository) }
+    private val db by lazy { AppDatabase.getInstance(applicationContext) }
+    private val repository by lazy { SessionRepository(db.sessionDao(), db.deviceDao()) }
+    private val studyArmManager by lazy { StudyArmManager(db.deviceDao()) }
+    private val promptRenderer by lazy { PromptRenderer() }
+    private val promptRepository by lazy { PromptRepository(applicationContext) }
+    private val promptEngine by lazy { PromptEngine(promptRepository, promptRenderer) }
+    private val promptManager by lazy { PromptManager(applicationContext) }
     private val interventionEngine by lazy {
-        val db = AppDatabase.getInstance(applicationContext)
-        InterventionEngine(repository, db.interventionDao(), promptRepository, promptManager)
+        InterventionEngine(repository, db.interventionDao(), studyArmManager, promptEngine, promptManager).also { engine ->
+            InterventionCompletionNotifier.listener = { interventionId, sessionId ->
+                engine.onInterventionCompleted(interventionId, sessionId)
+            }
+        }
     }
     private var currentSession: Session? = null
     private var mismatchCount: Int = 0

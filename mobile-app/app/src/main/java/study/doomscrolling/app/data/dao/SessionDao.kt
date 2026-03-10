@@ -16,9 +16,12 @@ interface SessionDao {
     @Update
     suspend fun updateSession(session: SessionEntity)
 
-    @Query("SELECT * FROM sessions WHERE sessionId = :sessionId LIMIT 1")
+    @Query("SELECT * FROM sessions WHERE session_id = :sessionId LIMIT 1")
     suspend fun getActiveSession(sessionId: String): SessionEntity?
 
-    @Query("SELECT * FROM sessions ORDER BY startTimestamp DESC")
+    @Query("SELECT * FROM sessions ORDER BY session_start_ts DESC")
     suspend fun getSessions(): List<SessionEntity>
+
+    @Query("DELETE FROM sessions WHERE session_id IN (:ids)")
+    suspend fun deleteSessions(ids: List<String>)
 }

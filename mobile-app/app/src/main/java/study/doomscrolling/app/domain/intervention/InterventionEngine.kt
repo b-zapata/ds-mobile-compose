@@ -8,8 +8,10 @@ import kotlinx.coroutines.launch
 import study.doomscrolling.app.data.dao.InterventionDao
 import study.doomscrolling.app.data.entities.InterventionEntity
 import study.doomscrolling.app.data.repository.SessionRepository
+import study.doomscrolling.app.domain.prompts.Prompt
+import study.doomscrolling.app.domain.prompts.PromptEngine
 import study.doomscrolling.app.domain.prompts.PromptManager
-import study.doomscrolling.app.domain.prompts.PromptRepository
+import study.doomscrolling.app.domain.study.StudyArmManager
 import java.util.UUID
 
 /**
@@ -19,7 +21,8 @@ import java.util.UUID
 class InterventionEngine(
     private val sessionRepository: SessionRepository,
     private val interventionDao: InterventionDao,
-    private val promptRepository: PromptRepository,
+    private val studyArmManager: StudyArmManager,
+    private val promptEngine: PromptEngine,
     private val promptManager: PromptManager
 ) {
 
@@ -55,21 +58,64 @@ class InterventionEngine(
         triggerType: String,
         checkpointMinutes: Int? = null
     ) {
-        if (sessionRepository.getActiveSession(sessionId) == null) {
-            return
-        }
+        val session = sessionRepository.getActiveSession(sessionId) ?: return
+        val studyArm = studyArmManager.getCurrentArm()
+        val milestoneMinutes = checkpointMinutes ?: 0
+
+        val promptInstance = promptEngine.selectPrompt(
+            studyArm = studyArm,
+            milestoneMinutes = milestoneMinutes
+        )
+        val now = System.currentTimeMillis()
+        val interventionId = UUID.randomUUID().toString()
         val entity = InterventionEntity(
-                interventionId = UUID.randomUUID().toString(),
-                sessionId = sessionId,
-                promptId = "placeholder",
-                triggerType = triggerType,
-                shownTimestamp = System.currentTimeMillis()
-            )
+            interventionId = interventionId,
+            deviceId = session.deviceId,
+            sessionId = sessionId,
+            interventionArm = studyArm.name.lowercase(),
+            milestoneMinutes = checkpointMinutes,
+            promptVariant = promptInstance.promptVariant,
+            interventionStartTs = now,
+            interventionEndTs = null,
+            userAction = null,
+            createdAt = now
+        )
         interventionDao.insertIntervention(entity)
         Log.i(TAG, "Intervention triggered" + (checkpointMinutes?.let { " at checkpoint $it minutes" } ?: ""))
-        val prompt = promptRepository.getRandomPrompt()
+
+        val prompt = Prompt(
+            id = "arm_${studyArm.name.lowercase()}_${milestoneMinutes}_${promptInstance.promptVariant}",
+            text = promptInstance.text,
+            category = "milestone_$milestoneMinutes"
+        )
         Log.i(TAG, "Prompt selected")
-        promptManager.showPrompt(prompt)
+        promptManager.showPrompt(
+            prompt = prompt,
+            interventionId = interventionId,
+            sessionId = sessionId
+        )
+    }
+
+    /**
+     * Called when the overlay completes after the 12-second intervention.
+     * Updates end timestamp and user_action based on whether the session is still active.
+     */
+    fun onInterventionCompleted(interventionId: String, sessionId: String) {
+        scope.launch {
+            val endTimestamp = System.currentTimeMillis()
+            val sessionStillActive = sessionRepository.getActiveSession(sessionId) != null
+            val userAction = if (sessionStillActive) {
+                "continued_session"
+            } else {
+                "closed_app"
+            }
+            interventionDao.updateInterventionCompletion(
+                interventionId = interventionId,
+                endTimestamp = endTimestamp,
+                userAction = userAction
+            )
+            Log.i(TAG, "Intervention completed for $interventionId with action=$userAction")
+        }
     }
 
     companion object {

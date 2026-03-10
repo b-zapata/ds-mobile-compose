@@ -18,6 +18,7 @@ import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import study.doomscrolling.app.R
+import study.doomscrolling.app.domain.intervention.InterventionCompletionNotifier
 
 /**
  * Foreground service that displays the prompt overlay above other apps using WindowManager.
@@ -31,6 +32,8 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
 
     private var overlayView: ComposeView? = null
     private var windowManager: WindowManager? = null
+    private var currentInterventionId: String? = null
+    private var currentSessionId: String? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -42,6 +45,8 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val promptText = intent?.getStringExtra(EXTRA_PROMPT_TEXT) ?: return START_NOT_STICKY
+        currentInterventionId = intent.getStringExtra(EXTRA_INTERVENTION_ID)
+        currentSessionId = intent.getStringExtra(EXTRA_SESSION_ID)
         val notification = buildNotification()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             startForeground(NOTIFICATION_ID, notification, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
@@ -94,6 +99,16 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
                 PromptOverlayView(
                     promptText = promptText,
                     onContinue = {
+                        val interventionId = currentInterventionId
+                        val sessionId = currentSessionId
+                        if (interventionId != null && sessionId != null) {
+                            InterventionCompletionNotifier.notifyCompleted(
+                                interventionId = interventionId,
+                                sessionId = sessionId
+                            )
+                        } else {
+                            Log.w(TAG, "Missing intervention/session id on overlay completion")
+                        }
                         removeOverlay()
                         Log.i(TAG, "Prompt overlay dismissed")
                         stopSelf()
@@ -129,5 +144,7 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
         const val EXTRA_PROMPT_ID = "prompt_id"
         const val EXTRA_PROMPT_TEXT = "prompt_text"
         const val EXTRA_PROMPT_CATEGORY = "prompt_category"
+        const val EXTRA_INTERVENTION_ID = "intervention_id"
+        const val EXTRA_SESSION_ID = "session_id"
     }
 }

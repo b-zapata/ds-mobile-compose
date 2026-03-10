@@ -1,5 +1,6 @@
 package study.doomscrolling.app.data.entities
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
@@ -8,7 +9,13 @@ import androidx.room.PrimaryKey
  */
 @Entity(tableName = "devices")
 data class DeviceEntity(
-    @PrimaryKey val deviceId: String,
-    val createdAt: Long,
-    val appVersion: String
+    @PrimaryKey
+    @ColumnInfo(name = "device_id")
+    val deviceId: String,
+    @ColumnInfo(name = "study_arm")
+    val studyArm: String?,
+    @ColumnInfo(name = "app_version")
+    val appVersion: String,
+    @ColumnInfo(name = "enrolled_at")
+    val enrolledAt: Long?
 )

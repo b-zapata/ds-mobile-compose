@@ -14,4 +14,7 @@ interface DeviceDao {
 
     @Query("SELECT * FROM devices LIMIT 1")
     suspend fun getDevice(): DeviceEntity?
+
+    @Query("DELETE FROM devices")
+    suspend fun resetDevice()
 }

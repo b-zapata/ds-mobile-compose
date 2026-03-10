@@ -4,7 +4,6 @@ import android.util.Log
 import study.doomscrolling.app.BuildConfig
 import study.doomscrolling.app.data.dao.DeviceDao
 import study.doomscrolling.app.data.dao.SessionDao
-import study.doomscrolling.app.data.entities.DeviceEntity
 import study.doomscrolling.app.data.entities.SessionEntity
 import java.util.UUID
 
@@ -29,7 +28,8 @@ class SessionRepository(
             packageName = packageName,
             startTimestamp = now,
             endTimestamp = null,
-            durationSeconds = null
+            durationSeconds = null,
+            createdAt = now
         )
         sessionDao.insertSession(entity)
         Log.i(TAG, "DB session inserted")
@@ -58,15 +58,8 @@ class SessionRepository(
     }
 
     private suspend fun requireDeviceId(): String {
-        var device = deviceDao.getDevice()
-        if (device == null) {
-            device = DeviceEntity(
-                deviceId = UUID.randomUUID().toString(),
-                createdAt = System.currentTimeMillis(),
-                appVersion = BuildConfig.VERSION_NAME ?: "1.0"
-            )
-            deviceDao.insertDevice(device)
-        }
+        val device = deviceDao.getDevice()
+            ?: error("Device must be registered before starting sessions")
         return device.deviceId
     }
 

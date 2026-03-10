@@ -1,5 +1,6 @@
 package study.doomscrolling.app.data.entities
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
@@ -8,10 +9,19 @@ import androidx.room.PrimaryKey
  */
 @Entity(tableName = "sessions")
 data class SessionEntity(
-    @PrimaryKey val sessionId: String,
+    @PrimaryKey
+    @ColumnInfo(name = "session_id")
+    val sessionId: String,
+    @ColumnInfo(name = "device_id")
     val deviceId: String,
+    @ColumnInfo(name = "app_package_name")
     val packageName: String,
+    @ColumnInfo(name = "session_start_ts")
     val startTimestamp: Long,
+    @ColumnInfo(name = "session_end_ts")
     val endTimestamp: Long? = null,
-    val durationSeconds: Long? = null
+    @ColumnInfo(name = "duration_seconds")
+    val durationSeconds: Long? = null,
+    @ColumnInfo(name = "created_at")
+    val createdAt: Long
 )
