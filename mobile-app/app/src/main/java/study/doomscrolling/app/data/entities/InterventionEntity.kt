@@ -2,9 +2,32 @@ package study.doomscrolling.app.data.entities
 
 import androidx.room.ColumnInfo
 import androidx.room.Entity
+import androidx.room.ForeignKey
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
-@Entity(tableName = "interventions")
+@Entity(
+    tableName = "interventions",
+    foreignKeys = [
+        ForeignKey(
+            entity = DeviceEntity::class,
+            parentColumns = ["device_id"],
+            childColumns = ["device_id"],
+            onDelete = ForeignKey.CASCADE
+        ),
+        ForeignKey(
+            entity = SessionEntity::class,
+            parentColumns = ["session_id"],
+            childColumns = ["session_id"],
+            onDelete = ForeignKey.CASCADE
+        )
+    ],
+    indices = [
+        Index(value = ["device_id"]),
+        Index(value = ["session_id"]),
+        Index(value = ["milestone_minutes"])
+    ]
+)
 data class InterventionEntity(
     @PrimaryKey
     @ColumnInfo(name = "intervention_id")
@@ -16,7 +39,7 @@ data class InterventionEntity(
     @ColumnInfo(name = "intervention_arm")
     val interventionArm: String,
     @ColumnInfo(name = "milestone_minutes")
-    val milestoneMinutes: Int?,
+    val milestoneMinutes: Int,
     @ColumnInfo(name = "prompt_variant")
     val promptVariant: Int,
     @ColumnInfo(name = "intervention_start_ts")

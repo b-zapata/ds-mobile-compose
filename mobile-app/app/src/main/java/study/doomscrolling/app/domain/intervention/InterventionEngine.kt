@@ -73,7 +73,7 @@ class InterventionEngine(
             deviceId = session.deviceId,
             sessionId = sessionId,
             interventionArm = studyArm.name.lowercase(),
-            milestoneMinutes = checkpointMinutes,
+            milestoneMinutes = milestoneMinutes,
             promptVariant = promptInstance.promptVariant,
             interventionStartTs = now,
             interventionEndTs = null,

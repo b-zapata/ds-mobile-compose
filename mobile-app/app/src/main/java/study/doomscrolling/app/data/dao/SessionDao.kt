@@ -22,6 +22,9 @@ interface SessionDao {
     @Query("SELECT * FROM sessions ORDER BY session_start_ts DESC")
     suspend fun getSessions(): List<SessionEntity>
 
+    @Query("SELECT * FROM sessions WHERE device_id = :deviceId ORDER BY session_start_ts DESC")
+    suspend fun getSessionsForDevice(deviceId: String): List<SessionEntity>
+
     /**
      * Most recent ended session for this device+package that ended no earlier than minEndTimestamp.
      * Used to extend (merge) sessions when the same app returns within the merge window.
