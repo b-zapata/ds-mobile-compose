@@ -16,7 +16,7 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import study.doomscrolling.app.data.database.AppDatabase
 import study.doomscrolling.app.data.entities.DeviceEntity
-import study.doomscrolling.app.workers.DailyUploadWorker
+import study.doomscrolling.app.workers.UploadWorker
 
 class DoomscrollingApplication : Application() {
 
@@ -26,7 +26,7 @@ class DoomscrollingApplication : Application() {
         super.onCreate()
         applicationScope.launch {
             ensureDeviceRegistered()
-            scheduleDailyUploadWorker()
+            scheduleResearchDataUploadWorker()
         }
     }
 
@@ -46,7 +46,7 @@ class DoomscrollingApplication : Application() {
         }
     }
 
-    private fun scheduleDailyUploadWorker() {
+    private fun scheduleResearchDataUploadWorker() {
         val constraints = Constraints.Builder()
             .setRequiredNetworkType(NetworkType.CONNECTED)
             .build()
@@ -58,13 +58,13 @@ class DoomscrollingApplication : Application() {
         }
         val delayMinutes = Duration.between(now, nextRun).toMinutes().coerceAtLeast(0)
 
-        val workRequest = PeriodicWorkRequestBuilder<DailyUploadWorker>(1, TimeUnit.DAYS)
+        val workRequest = PeriodicWorkRequestBuilder<UploadWorker>(1, TimeUnit.DAYS)
             .setInitialDelay(delayMinutes, TimeUnit.MINUTES)
             .setConstraints(constraints)
             .build()
 
         WorkManager.getInstance(this).enqueueUniquePeriodicWork(
-            "daily_upload_worker",
+            "research-data-upload",
             ExistingPeriodicWorkPolicy.KEEP,
             workRequest
         )

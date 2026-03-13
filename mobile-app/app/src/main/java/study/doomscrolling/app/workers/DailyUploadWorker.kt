@@ -13,20 +13,13 @@ class DailyUploadWorker(
 ) : CoroutineWorker(appContext, params) {
 
     override suspend fun doWork(): Result {
-        val db = AppDatabase.getInstance(applicationContext)
-        val repository = UploadRepository(
-            deviceDao = db.deviceDao(),
-            sessionDao = db.sessionDao(),
-            interventionDao = db.interventionDao(),
-            uploadApi = DefaultUploadApi(INGESTION_URL)
-        )
-        val success = repository.uploadPendingLogs()
-        return if (success) Result.success() else Result.retry()
+        // Deprecated by Phase 10 UploadWorker; kept to avoid breaking references if any.
+        // The scheduled job is now UploadWorker ("research-data-upload").
+        return Result.success()
     }
 
     companion object {
-        // HTTPS endpoint for ingestion API; replace with real endpoint in deployment.
-        private const val INGESTION_URL = "https://example.com/api/ingest"
+        // Intentionally unused.
     }
 }
 
