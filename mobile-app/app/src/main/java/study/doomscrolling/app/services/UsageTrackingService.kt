@@ -139,10 +139,10 @@ class UsageTrackingService : Service() {
     }
 
     private fun startSession(packageName: String) {
-        val now = System.currentTimeMillis()
-        val sessionId = runBlocking { repository.startSession(packageName) }
-        currentSession = createSession(sessionId, packageName, now)
-        interventionEngine.startMonitoring(sessionId, packageName, now)
+        if (repository.isSystemBlocklisted(packageName)) return
+        val (sessionId, startTs) = runBlocking { repository.startSessionOrExtendLast(packageName) }
+        currentSession = createSession(sessionId, packageName, startTs)
+        interventionEngine.startMonitoring(sessionId, packageName, startTs)
         Log.i(TAG, "Session started: ${MonitoredApps.displayName(packageName)}")
     }
 

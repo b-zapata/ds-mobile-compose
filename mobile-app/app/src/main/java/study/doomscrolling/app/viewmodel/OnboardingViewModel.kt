@@ -9,6 +9,7 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.launch
 import study.doomscrolling.app.BuildConfig
 import study.doomscrolling.app.data.database.AppDatabase
+import study.doomscrolling.app.data.repository.SessionRepository
 import study.doomscrolling.app.domain.study.StudyArm
 import study.doomscrolling.app.domain.study.StudyArmManager
 
@@ -34,6 +35,11 @@ class OnboardingViewModel(application: Application) : AndroidViewModel(applicati
         StudyArmManager(db.deviceDao())
     }
 
+    private val sessionRepository: SessionRepository by lazy {
+        val db = AppDatabase.getInstance(getApplication())
+        SessionRepository(db.sessionDao(), db.deviceDao())
+    }
+
     fun onDebugArmSelected(option: DebugArmOption) {
         selectedDebugArm = option
     }
@@ -46,6 +52,7 @@ class OnboardingViewModel(application: Application) : AndroidViewModel(applicati
      */
     fun applyStudyArmOverrideIfNeeded() {
         viewModelScope.launch {
+            // Ensure device exists first (assignArmIfNeeded creates it if missing), then import baseline.
             if (BuildConfig.DEBUG) {
                 val override = when (selectedDebugArm) {
                     DebugArmOption.RANDOM -> null
@@ -56,9 +63,10 @@ class OnboardingViewModel(application: Application) : AndroidViewModel(applicati
                 }
                 studyArmManager.assignArmIfNeeded(override)
             } else {
-                // Production: normal random assignment behavior.
                 studyArmManager.assignArmIfNeeded()
             }
+            // Import baseline after device is registered (needs device_id for session rows).
+            sessionRepository.importBaselineFromUsageStats(getApplication())
         }
     }
 

@@ -22,6 +22,26 @@ interface SessionDao {
     @Query("SELECT * FROM sessions ORDER BY session_start_ts DESC")
     suspend fun getSessions(): List<SessionEntity>
 
+    /**
+     * Most recent ended session for this device+package that ended no earlier than minEndTimestamp.
+     * Used to extend (merge) sessions when the same app returns within the merge window.
+     */
+    @Query(
+        "SELECT * FROM sessions " +
+            "WHERE device_id = :deviceId AND app_package_name = :packageName " +
+            "AND session_end_ts >= :minEndTimestamp " +
+            "ORDER BY session_end_ts DESC LIMIT 1"
+    )
+    suspend fun getMostRecentEndedSession(
+        deviceId: String,
+        packageName: String,
+        minEndTimestamp: Long
+    ): SessionEntity?
+
     @Query("DELETE FROM sessions WHERE session_id IN (:ids)")
     suspend fun deleteSessions(ids: List<String>)
+
+    /** Delete sessions that started in [startMs, endMs). Used to clear baseline window before re-import. */
+    @Query("DELETE FROM sessions WHERE session_start_ts >= :startMs AND session_start_ts < :endMs")
+    suspend fun deleteSessionsInRange(startMs: Long, endMs: Long)
 }

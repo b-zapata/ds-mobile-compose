@@ -5,6 +5,8 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import study.doomscrolling.app.BuildConfig
+import study.doomscrolling.app.ui.screens.BaselineStatsScreen
 import study.doomscrolling.app.ui.screens.ConsentScreen
 import study.doomscrolling.app.ui.screens.DashboardScreen
 import study.doomscrolling.app.ui.screens.EligibilityScreen
@@ -15,6 +17,7 @@ object AppDestinations {
     const val ELIGIBILITY = "eligibility"
     const val ONBOARDING = "onboarding"
     const val DASHBOARD = "dashboard"
+    const val BASELINE_STATS = "baseline_stats"
 }
 
 @Composable
@@ -42,7 +45,18 @@ fun AppNavHost(
             )
         }
         composable(AppDestinations.DASHBOARD) {
-            DashboardScreen()
+            DashboardScreen(
+                onOpenBaselineStats = {
+                    if (BuildConfig.DEBUG) {
+                        navController.navigate(AppDestinations.BASELINE_STATS)
+                    }
+                }
+            )
+        }
+        if (BuildConfig.DEBUG) {
+            composable(AppDestinations.BASELINE_STATS) {
+                BaselineStatsScreen()
+            }
         }
     }
 }
