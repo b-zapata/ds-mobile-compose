@@ -1,0 +1,26 @@
+{
+  "device_id": "a5e395f1-8403-423a-83d9-452282219610",
+  "sessions": [
+    {
+      "session_id": "9a69e2c7-8e78-4c5d-a395-b69031bb4991",
+      "device_id": "a5e395f1-8403-423a-83d9-452282219610",
+      "app_package_name": "com.instagram.android",
+      "session_start_ts": 1773729301858,
+      "session_end_ts": 1773729318016,
+      "duration_seconds": 16
+    }
+  ],
+  "interventions": [
+    {
+      "intervention_id": "18f469b6-75a9-427d-a9cb-2997fd26c182",
+      "session_id": "9a69e2c7-8e78-4c5d-a395-b69031bb4991",
+      "device_id": "a5e395f1-8403-423a-83d9-452282219610",
+      "milestone_minutes": 0,
+      "prompt_variant": 0,
+      "user_action": "continued_session",
+      "intervention_start_ts": 1773729301896,
+      "intervention_end_ts": 1773729309762
+    }
+  ]
+}
+

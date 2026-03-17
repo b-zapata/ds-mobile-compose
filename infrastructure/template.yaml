@@ -1,0 +1,48 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: Doomscrolling study - Phase 11 ingestion API (API Gateway -> Lambda)
+
+Globals:
+  Function:
+    Runtime: nodejs20.x
+    Timeout: 15
+    MemorySize: 256
+    Architectures:
+      - x86_64
+
+Resources:
+  IngestionFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../server/ingestion
+      # BuildMethod=esbuild bundles src/handler.ts to handler.js at the artifact root.
+      Handler: handler.handler
+      Environment:
+        Variables:
+          # Optional: when set, Lambda will attempt DB inserts.
+          DB_HOST: ""
+          DB_PORT: "5432"
+          DB_NAME: ""
+          DB_USER: ""
+          DB_PASSWORD: ""
+          DB_SSL: "false"
+      Events:
+        Ingest:
+          Type: HttpApi
+          Properties:
+            Path: /ingest
+            Method: POST
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        EntryPoints:
+          - src/handler.ts
+        Minify: false
+        Sourcemap: true
+        Target: es2020
+
+Outputs:
+  IngestionApiUrl:
+    Description: HTTP API endpoint base URL
+    Value: !Sub "https://${ServerlessHttpApi}.execute-api.${AWS::Region}.amazonaws.com"
+

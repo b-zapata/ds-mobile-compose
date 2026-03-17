@@ -82,3 +82,18 @@ Tools for simulating 10/15/20 minute milestones instantly.
 
 Required Action Before Study:
 Remove or disable.
+
+---
+
+## Manual Upload Trigger (Debug Only)
+
+Location:
+ui/screens/DashboardScreen.kt
+
+Description:
+Debug-only \"Upload Now\" button on the dashboard that enqueues a one-time `UploadWorker` via WorkManager to
+immediately send sessions + interventions to the current ingestion endpoint.
+
+Required Action Before Study:
+Ensure the button is only visible when BuildConfig.DEBUG == true, or remove the button entirely for
+production study builds.

@@ -1,0 +1,15 @@
+{
+  "name": "doomscrolling-ingestion",
+  "private": true,
+  "version": "0.1.0",
+  "type": "commonjs",
+  "main": "src/handler.ts",
+  "scripts": {
+    "lint": "node -e \"console.log('no lint configured')\""
+  },
+  "dependencies": {
+    "esbuild": "^0.25.1",
+    "pg": "^8.13.0"
+  }
+}
+
