@@ -82,6 +82,6 @@ class UploadWorker(
 
     companion object {
         private const val TAG = "UploadWorker"
-        private const val TEST_ENDPOINT = "https://kq8wm268h5.execute-api.us-west-2.amazonaws.com/ingest"
+        private const val TEST_ENDPOINT = "https://0jstclc8pi.execute-api.us-west-2.amazonaws.com/ingest"
     }
 }
