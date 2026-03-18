@@ -1,5 +1,7 @@
 package study.doomscrolling.app.data.upload
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -10,10 +12,10 @@ class UploadService(
 ) {
     private val jsonMediaType = "application/json; charset=utf-8".toMediaType()
 
-    fun postJson(
+    suspend fun postJson(
         url: String,
         jsonBody: String
-    ): Pair<Int, String> {
+    ): Pair<Int, String> = withContext(Dispatchers.IO) {
         val body = jsonBody.toRequestBody(jsonMediaType)
         val request = Request.Builder()
             .url(url)
@@ -23,8 +25,7 @@ class UploadService(
 
         client.newCall(request).execute().use { response ->
             val responseBody = response.body?.string().orEmpty()
-            return response.code to responseBody
+            response.code to responseBody
         }
     }
 }
-

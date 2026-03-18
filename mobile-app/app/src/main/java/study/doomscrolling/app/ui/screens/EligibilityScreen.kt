@@ -23,6 +23,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import study.doomscrolling.app.services.ForegroundAppDetector
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.runtime.collectAsState
+import study.doomscrolling.app.viewmodel.EligibilityUiState
+import study.doomscrolling.app.viewmodel.EligibilityViewModel
 
 @Composable
 fun EligibilityScreen(
@@ -85,29 +89,53 @@ fun EligibilityScreen(
 
         Spacer(modifier = Modifier.height(32.dp))
 
+        val eligibilityViewModel: EligibilityViewModel = viewModel()
+        val eligibilityState: EligibilityUiState by eligibilityViewModel.uiState.collectAsState()
+
         Button(
+            enabled = !eligibilityState.checking,
             onClick = {
                 hasUsagePermission = ForegroundAppDetector.hasUsageStatsPermission(context)
                 hasOverlayPermission = hasOverlayPermission(context)
             }
         ) {
-            Text("Refresh status")
+            Text("Refresh permissions")
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        if (hasUsagePermission && hasOverlayPermission) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Button(
+                enabled = !eligibilityState.checking,
+                onClick = { eligibilityViewModel.checkEligibilityAndUploadBaseline() }
+            ) {
+                Text(if (eligibilityState.checking) "Checking eligibility…" else "Check eligibility")
+            }
+        }
+
+        eligibilityState.message?.let { msg ->
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = msg,
+                style = MaterialTheme.typography.bodyMedium
+            )
         }
 
         Spacer(modifier = Modifier.height(16.dp))
 
         Button(
-            enabled = hasUsagePermission && hasOverlayPermission,
+            enabled = hasUsagePermission && hasOverlayPermission && eligibilityState.eligible == true && !eligibilityState.checking,
             onClick = {
-                // Re-check before continuing in case user granted permissions while returning.
+                // Re-check permissions before continuing.
                 hasUsagePermission = ForegroundAppDetector.hasUsageStatsPermission(context)
                 hasOverlayPermission = hasOverlayPermission(context)
-                if (hasUsagePermission && hasOverlayPermission) {
+                if (hasUsagePermission && hasOverlayPermission && eligibilityState.eligible == true) {
                     onComplete()
                 }
             }
         ) {
-            Text("Continue")
+            Text("Continue to onboarding")
         }
     }
 }

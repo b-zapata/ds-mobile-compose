@@ -281,7 +281,7 @@ class SessionRepository(
         sessionDao.deleteSessionsInRange(baselineWindowStart, baselineWindowEnd)
 
         val deviceId = requireDeviceId()
-        var totalRows = 0
+        val baselineEntities = mutableListOf<SessionEntity>()
 
         for (dayOffset in 0 until 7) {
             val date = today.minusDays(dayOffset.toLong())
@@ -291,7 +291,7 @@ class SessionRepository(
             val usageMap = getScreenUsageForInterval(manager, dayStartMs, endMs)
             for ((pkg, totalSeconds) in usageMap) {
                 if (totalSeconds <= 0L) continue
-                sessionDao.insertSession(
+                baselineEntities.add(
                     SessionEntity(
                         sessionId = UUID.randomUUID().toString(),
                         deviceId = deviceId,
@@ -302,11 +302,11 @@ class SessionRepository(
                         createdAt = now
                     )
                 )
-                totalRows++
             }
         }
 
-        Log.i(TAG, "Imported $totalRows baseline session rows (event-based, 7 days)")
+        sessionDao.insertSessions(baselineEntities)
+        Log.i(TAG, "Imported ${baselineEntities.size} baseline session rows (event-based, 7 days)")
     }
 
     private suspend fun requireDeviceId(): String {

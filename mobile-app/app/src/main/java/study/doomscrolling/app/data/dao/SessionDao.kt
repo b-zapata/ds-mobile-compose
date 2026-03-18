@@ -13,6 +13,9 @@ interface SessionDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertSession(session: SessionEntity)
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertSessions(sessions: List<SessionEntity>)
+
     @Update
     suspend fun updateSession(session: SessionEntity)
 
