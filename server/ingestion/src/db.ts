@@ -44,9 +44,6 @@ export async function insertUploadPayload(payload: UploadPayload, config: DbConf
 
   await client.connect();
   try {
-    // Ensure tables/indexes exist. Safe to call on every run.
-    await ensureSchema(client);
-
     await client.query("BEGIN");
 
     // devices: upsert by device_id. (Other columns may be null until Phase 12 expands.)
@@ -72,8 +69,31 @@ export async function insertUploadPayload(payload: UploadPayload, config: DbConf
     }
 
     await client.query("COMMIT");
-  } catch (e) {
+  } catch (e: any) {
     await client.query("ROLLBACK");
+    // If schema hasn't been applied yet, create it and retry once.
+    // Postgres missing table: SQLSTATE 42P01.
+    if (e?.code === "42P01") {
+      await ensureSchema(client);
+      await client.query("BEGIN");
+      try {
+        await client.query(
+          `
+          INSERT INTO devices (device_id)
+          VALUES ($1)
+          ON CONFLICT (device_id) DO NOTHING
+          `,
+          [payload.device_id]
+        );
+        for (const s of payload.sessions) await insertSession(client, s);
+        for (const i of payload.interventions) await insertIntervention(client, i);
+        await client.query("COMMIT");
+        return;
+      } catch (e2) {
+        await client.query("ROLLBACK");
+        throw e2;
+      }
+    }
     throw e;
   } finally {
     await client.end();

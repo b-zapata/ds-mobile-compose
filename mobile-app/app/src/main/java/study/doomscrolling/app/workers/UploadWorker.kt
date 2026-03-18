@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
+import study.doomscrolling.app.BuildConfig
 import study.doomscrolling.app.data.database.AppDatabase
 import study.doomscrolling.app.data.upload.UploadIntervention
 import study.doomscrolling.app.data.upload.UploadPayload
@@ -64,7 +65,7 @@ class UploadWorker(
         Log.i(TAG, "UPLOAD_PAYLOAD_SIZE bytes=${json.toByteArray().size}")
 
         return try {
-            val (code, body) = UploadService().postJson(TEST_ENDPOINT, json)
+            val (code, body) = UploadService().postJson(ENDPOINT, json)
             Log.i(TAG, "UPLOAD_RESPONSE status=$code body=${body.take(2000)}")
             if (code in 200..299) {
                 Log.i(TAG, "UPLOAD_SUCCESS")
@@ -82,6 +83,6 @@ class UploadWorker(
 
     companion object {
         private const val TAG = "UploadWorker"
-        private const val TEST_ENDPOINT = "https://0jstclc8pi.execute-api.us-west-2.amazonaws.com/ingest"
+        private val ENDPOINT: String = BuildConfig.INGESTION_URL
     }
 }

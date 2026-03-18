@@ -16,6 +16,15 @@ Parameters:
   DbPasswordParam:
     Type: String
     NoEcho: true
+  BackupRetentionDaysParam:
+    Type: Number
+    Default: 7
+    Description: RDS automated backup retention in days.
+  EnableDeletionProtectionParam:
+    Type: String
+    Default: "true"
+    AllowedValues: ["true", "false"]
+    Description: Enable deletion protection on the RDS instance.
   AdminTokenParam:
     Type: String
     NoEcho: true
@@ -28,6 +37,9 @@ Globals:
     MemorySize: 256
     Architectures:
       - x86_64
+
+Conditions:
+  DeletionProtectionEnabled: !Equals [!Ref EnableDeletionProtectionParam, "true"]
 
 Resources:
   Vpc:
@@ -123,11 +135,12 @@ Resources:
       DBName: !Ref DbNameParam
       MasterUsername: !Ref DbUserParam
       MasterUserPassword: !Ref DbPasswordParam
+      BackupRetentionPeriod: !Ref BackupRetentionDaysParam
       VPCSecurityGroups:
         - !Ref RdsSecurityGroup
       DBSubnetGroupName: !Ref PostgresSubnetGroup
       PubliclyAccessible: true
-      DeletionProtection: false
+      DeletionProtection: !If [DeletionProtectionEnabled, true, false]
 
   IngestionFunction:
     Type: AWS::Serverless::Function
