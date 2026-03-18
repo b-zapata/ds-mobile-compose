@@ -1,4 +1,4 @@
-import { insertUploadPayload, getDbConfigFromEnv } from "./db";
+import { exportInterventionsCsv, exportSessionsCsv, getCounts, getDbConfigFromEnv, insertUploadPayload } from "./db";
 import { validatePayload } from "./validate";
 
 type ApiResult = {
@@ -17,7 +17,64 @@ function json(statusCode: number, body: unknown): ApiResult {
   };
 }
 
+function text(statusCode: number, body: string, contentType: string): ApiResult {
+  return {
+    statusCode,
+    headers: {
+      "content-type": contentType
+    },
+    body
+  };
+}
+
+function requireAdmin(event: any): ApiResult | null {
+  const token = process.env.ADMIN_TOKEN;
+  if (!token) {
+    return json(404, { ok: false, error: "Not found" });
+  }
+  const headerToken = (event.headers?.["x-admin-token"] ??
+    event.headers?.["X-Admin-Token"] ??
+    event.headers?.["x-admin-token".toUpperCase()]) as string | undefined;
+  if (!headerToken || headerToken !== token) {
+    return json(401, { ok: false, error: "Unauthorized" });
+  }
+  return null;
+}
+
 export const handler = async (event: any): Promise<ApiResult> => {
+  const method = event?.requestContext?.http?.method ?? event?.httpMethod ?? "POST";
+  const path = event?.rawPath ?? event?.path ?? "";
+
+  if (path.startsWith("/admin")) {
+    const authErr = requireAdmin(event);
+    if (authErr) return authErr;
+    const dbConfig = getDbConfigFromEnv(process.env);
+    if (!dbConfig) return json(500, { ok: false, error: "DB not configured" });
+
+    try {
+      if (method === "GET" && path === "/admin/counts") {
+        const counts = await getCounts(dbConfig);
+        return json(200, { ok: true, counts });
+      }
+      if (method === "GET" && path === "/admin/sessions.csv") {
+        const since = event?.queryStringParameters?.since_ms;
+        const sinceMs = since ? Number(since) : undefined;
+        const csv = await exportSessionsCsv(dbConfig, Number.isFinite(sinceMs as any) ? sinceMs : undefined);
+        return text(200, csv, "text/csv; charset=utf-8");
+      }
+      if (method === "GET" && path === "/admin/interventions.csv") {
+        const since = event?.queryStringParameters?.since_ms;
+        const sinceMs = since ? Number(since) : undefined;
+        const csv = await exportInterventionsCsv(dbConfig, Number.isFinite(sinceMs as any) ? sinceMs : undefined);
+        return text(200, csv, "text/csv; charset=utf-8");
+      }
+      return json(404, { ok: false, error: "Not found" });
+    } catch (e) {
+      console.error("ADMIN_ENDPOINT_FAILED", e);
+      return json(500, { ok: false, error: "Internal error" });
+    }
+  }
+
   if (!event.body) {
     return json(400, { ok: false, error: "Missing body" });
   }

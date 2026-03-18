@@ -1,6 +1,25 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
-Description: Doomscrolling study - Phase 11 ingestion API (API Gateway -> Lambda)
+Description: Doomscrolling study - Phase 11/12 ingestion API (API Gateway -> Lambda -> PostgreSQL)
+
+Parameters:
+  AllowedClientIpCidrParam:
+    Type: String
+    Description: Your public IP in CIDR form (e.g. 1.2.3.4/32) for direct DB access.
+    Default: "0.0.0.0/32"
+  DbNameParam:
+    Type: String
+    Default: doomscrolling
+  DbUserParam:
+    Type: String
+    Default: doom_user
+  DbPasswordParam:
+    Type: String
+    NoEcho: true
+  AdminTokenParam:
+    Type: String
+    NoEcho: true
+    Default: ""
 
 Globals:
   Function:
@@ -11,6 +30,105 @@ Globals:
       - x86_64
 
 Resources:
+  Vpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref Vpc
+      InternetGatewayId: !Ref InternetGateway
+
+  PublicSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: 10.0.10.0/24
+      AvailabilityZone: !Sub "${AWS::Region}a"
+
+  PublicSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: 10.0.11.0/24
+      AvailabilityZone: !Sub "${AWS::Region}b"
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+
+  PublicDefaultRoute:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  PublicSubnetARouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnetA
+      RouteTableId: !Ref PublicRouteTable
+
+  PublicSubnetBRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnetB
+      RouteTableId: !Ref PublicRouteTable
+
+  LambdaSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Lambda access to RDS
+      VpcId: !Ref Vpc
+
+  RdsSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: PostgreSQL access from Lambda
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          SourceSecurityGroupId: !Ref LambdaSecurityGroup
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          CidrIp: !Ref AllowedClientIpCidrParam
+
+  PostgresSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: Doomscrolling study DB subnets
+      SubnetIds:
+        - !Ref PublicSubnetA
+        - !Ref PublicSubnetB
+
+  PostgresInstance:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      Engine: postgres
+      DBInstanceClass: db.t4g.micro
+      AllocatedStorage: 20
+      DBName: !Ref DbNameParam
+      MasterUsername: !Ref DbUserParam
+      MasterUserPassword: !Ref DbPasswordParam
+      VPCSecurityGroups:
+        - !Ref RdsSecurityGroup
+      DBSubnetGroupName: !Ref PostgresSubnetGroup
+      PubliclyAccessible: true
+      DeletionProtection: false
+
   IngestionFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -19,13 +137,19 @@ Resources:
       Handler: handler.handler
       Environment:
         Variables:
-          # Optional: when set, Lambda will attempt DB inserts.
-          DB_HOST: ""
-          DB_PORT: "5432"
-          DB_NAME: ""
-          DB_USER: ""
-          DB_PASSWORD: ""
-          DB_SSL: "false"
+          DB_HOST: !GetAtt PostgresInstance.Endpoint.Address
+          DB_PORT: !GetAtt PostgresInstance.Endpoint.Port
+          DB_NAME: !Ref DbNameParam
+          DB_USER: !Ref DbUserParam
+          DB_PASSWORD: !Ref DbPasswordParam
+          DB_SSL: "true"
+          ADMIN_TOKEN: !Ref AdminTokenParam
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref LambdaSecurityGroup
+        SubnetIds:
+          - !Ref PublicSubnetA
+          - !Ref PublicSubnetB
       Events:
         Ingest:
           Type: HttpApi
@@ -45,4 +169,7 @@ Outputs:
   IngestionApiUrl:
     Description: HTTP API endpoint base URL
     Value: !Sub "https://${ServerlessHttpApi}.execute-api.${AWS::Region}.amazonaws.com"
+  PostgresEndpoint:
+    Description: RDS PostgreSQL endpoint (host)
+    Value: !GetAtt PostgresInstance.Endpoint.Address
 

@@ -8,6 +8,7 @@ profile = "study"
 confirm_changeset = true
 capabilities = "CAPABILITY_IAM"
 image_repositories = []
+parameter_overrides = "DbNameParam=\"doomscrolling\" DbUserParam=\"doom_user\""
 
 [dev.global.parameters]
 region = "us-west-2"

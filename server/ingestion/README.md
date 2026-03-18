@@ -55,3 +55,17 @@ The template outputs the base URL. Your ingest URL will be:
 
 - `<baseUrl>/ingest`
 
+## Admin (debug) endpoints
+
+This Lambda can also expose admin endpoints to help export data when the DB is private.
+These are disabled by default. To enable, set `AdminTokenParam` during deploy and include the header
+`x-admin-token: <token>` in requests.
+
+- `GET /admin/counts`
+- `GET /admin/sessions.csv`
+- `GET /admin/interventions.csv`
+
+Optional query parameter:
+
+- `since_ms=<epoch_ms>` filters by start timestamp.
+
