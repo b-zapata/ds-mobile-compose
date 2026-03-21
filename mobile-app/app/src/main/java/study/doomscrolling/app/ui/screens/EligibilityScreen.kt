@@ -1,168 +1,71 @@
 package study.doomscrolling.app.ui.screens
 
-import android.content.Intent
-import android.net.Uri
-import android.os.Build
-import android.provider.Settings
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
-import androidx.compose.material3.Button
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import study.doomscrolling.app.services.ForegroundAppDetector
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.compose.runtime.collectAsState
-import study.doomscrolling.app.viewmodel.EligibilityUiState
 import study.doomscrolling.app.viewmodel.EligibilityViewModel
 
 @Composable
 fun EligibilityScreen(
-    onComplete: () -> Unit
+    onComplete: () -> Unit,
+    viewModel: EligibilityViewModel = viewModel()
 ) {
-    val context = LocalContext.current
-    var hasUsagePermission by remember { mutableStateOf(false) }
-    var hasOverlayPermission by remember { mutableStateOf(hasOverlayPermission(context)) }
-
-    LaunchedEffect(Unit) {
-        hasUsagePermission = ForegroundAppDetector.hasUsageStatsPermission(context)
-        hasOverlayPermission = hasOverlayPermission(context)
-    }
+    val state by viewModel.uiState.collectAsState()
 
     Column(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
         Text(
-            text = "Permissions",
+            text = "Eligibility Check",
             style = MaterialTheme.typography.headlineMedium
         )
         Spacer(modifier = Modifier.height(16.dp))
+        
         Text(
-            text = "To participate in this study, the app needs:\n\n" +
-                "- Usage access permission (to reconstruct app sessions)\n" +
-                "- Display over other apps permission (to show brief intervention overlays)",
-            style = MaterialTheme.typography.bodyMedium
+            text = "DEBUG MODE: Server enrollment is currently on hold. Tap the button below to enroll locally and continue development.",
+            style = MaterialTheme.typography.bodyMedium,
+            textAlign = TextAlign.Center,
+            color = MaterialTheme.colorScheme.primary
         )
-        Spacer(modifier = Modifier.height(24.dp))
-
-        Text(
-            text = "Usage access permission: " + if (hasUsagePermission) "Granted" else "Not granted",
-            style = MaterialTheme.typography.bodyMedium
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Button(
-            onClick = {
-                openUsageAccessSettings(context)
-            }
-        ) {
-            Text("Open usage access settings")
-        }
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        Text(
-            text = "Display over other apps: " + if (hasOverlayPermission) "Granted" else "Not granted",
-            style = MaterialTheme.typography.bodyMedium
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Button(
-            onClick = {
-                openOverlaySettings(context)
-            }
-        ) {
-            Text("Open overlay settings")
-        }
-
+        
         Spacer(modifier = Modifier.height(32.dp))
 
-        val eligibilityViewModel: EligibilityViewModel = viewModel()
-        val eligibilityState: EligibilityUiState by eligibilityViewModel.uiState.collectAsState()
-
-        Button(
-            enabled = !eligibilityState.checking,
-            onClick = {
-                hasUsagePermission = ForegroundAppDetector.hasUsageStatsPermission(context)
-                hasOverlayPermission = hasOverlayPermission(context)
-            }
-        ) {
-            Text("Refresh permissions")
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        if (hasUsagePermission && hasOverlayPermission) {
-            Spacer(modifier = Modifier.height(8.dp))
-            Button(
-                enabled = !eligibilityState.checking,
-                onClick = { eligibilityViewModel.checkEligibilityAndUploadBaseline() }
-            ) {
-                Text(if (eligibilityState.checking) "Checking eligibility…" else "Check eligibility")
-            }
-        }
-
-        eligibilityState.message?.let { msg ->
+        if (state.checking) {
+            CircularProgressIndicator()
             Spacer(modifier = Modifier.height(16.dp))
+            Text("Enrolling locally...")
+        } else {
+            Button(
+                onClick = { viewModel.skipEligibilityAndEnrollLocally() }
+            ) {
+                Text("Enroll Locally (Skip Server)")
+            }
+        }
+
+        state.message?.let { msg ->
+            Spacer(modifier = Modifier.height(24.dp))
             Text(
                 text = msg,
-                style = MaterialTheme.typography.bodyMedium
+                style = MaterialTheme.typography.bodyMedium,
+                textAlign = TextAlign.Center,
+                color = if (state.eligible == false) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
             )
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Button(
-            enabled = hasUsagePermission && hasOverlayPermission && eligibilityState.eligible == true && !eligibilityState.checking,
-            onClick = {
-                // Re-check permissions before continuing.
-                hasUsagePermission = ForegroundAppDetector.hasUsageStatsPermission(context)
-                hasOverlayPermission = hasOverlayPermission(context)
-                if (hasUsagePermission && hasOverlayPermission && eligibilityState.eligible == true) {
-                    onComplete()
-                }
+        if (state.eligible == true && !state.checking) {
+            Spacer(modifier = Modifier.height(32.dp))
+            Button(onClick = onComplete) {
+                Text("Continue")
             }
-        ) {
-            Text("Continue to onboarding")
         }
-    }
-}
-
-private fun hasOverlayPermission(context: android.content.Context): Boolean {
-    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-        Settings.canDrawOverlays(context)
-    } else {
-        true
-    }
-}
-
-private fun openUsageAccessSettings(context: android.content.Context) {
-    val intent = Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS).apply {
-        flags = Intent.FLAG_ACTIVITY_NEW_TASK
-    }
-    context.startActivity(intent)
-}
-
-private fun openOverlaySettings(context: android.content.Context) {
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-        val intent = Intent(
-            Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-            Uri.parse("package:${context.packageName}")
-        ).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK
-        }
-        context.startActivity(intent)
     }
 }

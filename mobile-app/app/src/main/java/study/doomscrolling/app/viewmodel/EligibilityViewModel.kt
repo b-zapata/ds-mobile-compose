@@ -37,8 +37,46 @@ class EligibilityViewModel(application: Application) : AndroidViewModel(applicat
     val uiState = _uiState.asStateFlow()
 
     /**
+     * Skip the server-side eligibility check for now while AWS is being debugged.
+     * Marks the device as enrolled immediately in the local database.
+     */
+    fun skipEligibilityAndEnrollLocally() {
+        if (_uiState.value.checking) return
+        viewModelScope.launch {
+            _uiState.value = EligibilityUiState(checking = true, eligible = null, message = "Enrolling locally (Bypassing server)…")
+            
+            val device = withContext(Dispatchers.IO) {
+                db.deviceDao().getDevice()
+            }
+            
+            if (device == null) {
+                _uiState.value = EligibilityUiState(
+                    checking = false,
+                    eligible = false,
+                    message = "Error: Device not found. Please sign the consent form first."
+                )
+                return@launch
+            }
+
+            // Mark as enrolled locally without calling the API
+            withContext(Dispatchers.IO) {
+                val updatedDevice = device.copy(enrolledAt = System.currentTimeMillis())
+                db.deviceDao().insertDevice(updatedDevice)
+            }
+
+            _uiState.value = EligibilityUiState(
+                checking = false,
+                eligible = true,
+                message = "Local enrollment successful! (Server check skipped for debugging)."
+            )
+        }
+    }
+
+    /**
      * Run baseline import for the last 7 days, evaluate eligibility (used any monitored app
      * on at least 5 of the last 7 days), and if eligible upload the baseline sessions to the server.
+     * 
+     * NOTE: This is the REAL implementation. It is currently on hold while debugging AWS.
      */
     fun checkEligibilityAndUploadBaseline() {
         if (_uiState.value.checking) return
@@ -125,6 +163,12 @@ class EligibilityViewModel(application: Application) : AndroidViewModel(applicat
             val (code, _) = UploadService().postJson(BuildConfig.INGESTION_URL, json)
 
             if (code in 200..299) {
+                // MARK ELIGIBILITY AS PASSED by setting enrolledAt
+                withContext(Dispatchers.IO) {
+                    val updatedDevice = device.copy(enrolledAt = System.currentTimeMillis())
+                    db.deviceDao().insertDevice(updatedDevice)
+                }
+
                 _uiState.value = EligibilityUiState(
                     checking = false,
                     eligible = true,
