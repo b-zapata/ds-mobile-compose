@@ -18,10 +18,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import study.doomscrolling.app.viewmodel.ConsentViewModel
 
 @Composable
 fun ConsentScreen(
-    onAccept: () -> Unit
+    onAccept: () -> Unit,
+    viewModel: ConsentViewModel = viewModel()
 ) {
     val scrollState = rememberScrollState()
 
@@ -64,7 +67,7 @@ Participation in this study is voluntary.
 
 Purpose of the Study
 
-The purpose of this study is to evaluate how short interruptions during social media use affect how people interact with mobile apps. The research aims to better understand whether brief prompts or tasks can help people pause and reflect on their phone usage and decide whether they want to continue using an app.
+The purpose of this study is to evaluate how short interruptions during social media use affect how people interact with mobile apps. The research aims to better understand whether brief prompts or tasks can help people pause and reflect on their phone usage and decide whether they want continue using an app.
 
 What You Will Be Asked to Do
 
@@ -149,7 +152,10 @@ If you would like to participate in this study, please select “Accept” to co
                 .fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Button(onClick = onAccept, contentPadding = PaddingValues(horizontal = 32.dp, vertical = 12.dp)) {
+            Button(
+                onClick = { viewModel.acceptConsent(onAccept) }, 
+                contentPadding = PaddingValues(horizontal = 32.dp, vertical = 12.dp)
+            ) {
                 Text("Accept")
             }
             Spacer(modifier = Modifier.height(24.dp))

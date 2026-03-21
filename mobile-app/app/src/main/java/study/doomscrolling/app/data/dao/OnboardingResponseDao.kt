@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import kotlinx.coroutines.flow.Flow
 import study.doomscrolling.app.data.entities.OnboardingResponseEntity
 
 @Dao
@@ -14,6 +15,9 @@ interface OnboardingResponseDao {
 
     @Query("SELECT * FROM onboarding_responses WHERE device_id = :deviceId LIMIT 1")
     suspend fun getOnboardingResponse(deviceId: String): OnboardingResponseEntity?
+
+    @Query("SELECT * FROM onboarding_responses WHERE device_id = :deviceId LIMIT 1")
+    fun observeOnboardingResponse(deviceId: String): Flow<OnboardingResponseEntity?>
 
     @Query("DELETE FROM onboarding_responses")
     suspend fun resetOnboardingResponses()

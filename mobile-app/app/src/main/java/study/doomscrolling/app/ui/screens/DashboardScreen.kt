@@ -19,8 +19,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
+import kotlinx.coroutines.flow.collectLatest
 import study.doomscrolling.app.BuildConfig
 import study.doomscrolling.app.data.database.AppDatabase
+import study.doomscrolling.app.data.entities.ExitSurveyResponseEntity
+import study.doomscrolling.app.data.entities.OnboardingResponseEntity
 import study.doomscrolling.app.services.ForegroundAppDetector
 import study.doomscrolling.app.workers.UploadWorker
 
@@ -37,31 +40,46 @@ fun DashboardScreen(
     val context = LocalContext.current
     val db = remember { AppDatabase.getInstance(context) }
     
-    // States for the checklist items
-    var hasConsented by remember { mutableStateOf(false) }
+    // States for the checklist items observed as Flow
+    val device by db.deviceDao().observeDevice().collectAsState(initial = null)
+    
+    val hasConsented = device != null
+    val isEligible = device?.enrolledAt != null
+    
+    // For permissions we still need a side-effect because they aren't in the DB
     var hasPermissions by remember { mutableStateOf(false) }
-    var isEligible by remember { mutableStateOf(false) }
-    var hasOnboarded by remember { mutableStateOf(false) }
-    var studyCompleted by remember { mutableStateOf(false) }
-    var hasExited by remember { mutableStateOf(false) }
+    
+    // Check onboarding from the table
+    var onboarding by remember { mutableStateOf<OnboardingResponseEntity?>(null) }
+    LaunchedEffect(device?.deviceId) {
+        val deviceId = device?.deviceId
+        if (deviceId != null) {
+            db.onboardingResponseDao().observeOnboardingResponse(deviceId).collectLatest {
+                onboarding = it
+            }
+        }
+    }
+    val hasOnboarded = onboarding != null
+
+    // Check exit survey from the table
+    var exitSurvey by remember { mutableStateOf<ExitSurveyResponseEntity?>(null) }
+    LaunchedEffect(device?.deviceId) {
+        val deviceId = device?.deviceId
+        if (deviceId != null) {
+            db.exitSurveyResponseDao().observeExitSurveyResponse(deviceId).collectLatest {
+                exitSurvey = it
+            }
+        }
+    }
+    val hasExited = exitSurvey != null
     
     var timeRemainingText by remember { mutableStateOf<String?>(null) }
+    var studyCompleted by remember { mutableStateOf(false) }
 
-    // Refresh states from DB/System
-    LaunchedEffect(Unit) {
-        val device = db.deviceDao().getDevice()
-        hasConsented = device != null
+    // Refresh states from System and handle countdown
+    LaunchedEffect(device) {
         hasPermissions = ForegroundAppDetector.hasUsageStatsPermission(context) &&
                 Settings.canDrawOverlays(context)
-        isEligible = device?.enrolledAt != null
-        
-        // Check onboarding from the table
-        val onboarding = if (device != null) db.onboardingResponseDao().getOnboardingResponse(device.deviceId) else null
-        hasOnboarded = onboarding != null
-
-        // Check exit survey from the table
-        val exitSurvey = if (device != null) db.exitSurveyResponseDao().getExitSurveyResponse(device.deviceId) else null
-        hasExited = exitSurvey != null
         
         val enrolledAt = device?.enrolledAt
         if (enrolledAt != null) {
