@@ -37,10 +37,16 @@ class InterventionEngine(
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var monitoringJob: kotlinx.coroutines.Job? = null
+    
+    // Track if a heads-up is currently active to prevent session-ending during the 10s window
+    @Volatile
+    private var isHeadsUpActive: Boolean = false
 
     init {
         createNotificationChannels()
     }
+
+    fun isHeadsUpPending(): Boolean = isHeadsUpActive
 
     /**
      * Start intervention scheduling for this session. Call when session starts.
@@ -59,11 +65,15 @@ class InterventionEngine(
     fun stopMonitoring() {
         monitoringJob?.cancel()
         monitoringJob = null
+        isHeadsUpActive = false
+        val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        nm.cancel(SOFT_WARNING_NOTIFICATION_ID)
+        nm.cancel(HEADS_UP_NOTIFICATION_ID)
         Log.i(TAG, "Intervention scheduler stopped")
     }
 
     /**
-     * Displays a subtle, silent notification 60 seconds before an intervention.
+     * Displays a notification 60 seconds before an intervention.
      */
     fun showSoftWarningNotification(milestoneMinutes: Int) {
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -71,7 +81,11 @@ class InterventionEngine(
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setContentTitle("Reflection point approaching")
             .setContentText("A reflection pause will occur in 1 minute.")
-            .setPriority(NotificationCompat.PRIORITY_LOW) // Silent, no peek
+            .setPriority(NotificationCompat.PRIORITY_MAX) // Max priority for top-level visibility
+            .setCategory(NotificationCompat.CATEGORY_EVENT)
+            .setSortKey("0") // Hint to sort at the top
+            .setShowWhen(true)
+            .setWhen(System.currentTimeMillis())
             .setAutoCancel(true)
             .build()
 
@@ -82,12 +96,16 @@ class InterventionEngine(
      * Displays a high-priority heads-up notification to warn the user that an intervention is coming.
      */
     fun showHeadsUpNotification(milestoneMinutes: Int) {
+        isHeadsUpActive = true
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        
+        notificationManager.cancel(SOFT_WARNING_NOTIFICATION_ID)
+
         val notification = NotificationCompat.Builder(context, HEADS_UP_CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
             .setContentTitle("Study Pause Coming")
             .setContentText("A reflection pause will start in 10 seconds.")
-            .setPriority(NotificationCompat.PRIORITY_HIGH) // Slides down (heads-up)
+            .setPriority(NotificationCompat.PRIORITY_HIGH) 
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setAutoCancel(true)
             .build()
@@ -99,16 +117,17 @@ class InterventionEngine(
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
             val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             
-            // Channel 1: Soft Warning (Silent)
             val softChannel = NotificationChannel(
                 SOFT_WARNING_CHANNEL_ID,
                 "Study Reflection Warnings",
-                NotificationManager.IMPORTANCE_LOW
+                NotificationManager.IMPORTANCE_HIGH 
             ).apply {
-                description = "Silent alerts 1 minute before a study pause"
+                description = "Status bar alerts 1 minute before a study pause"
+                enableLights(false)
+                enableVibration(false)
+                setSound(null, null)
             }
             
-            // Channel 2: Heads-Up (Slide down)
             val headsUpChannel = NotificationChannel(
                 HEADS_UP_CHANNEL_ID,
                 "Heads-Up Notifications",
@@ -124,16 +143,19 @@ class InterventionEngine(
 
     /**
      * Verify session is still active, then persist intervention and log.
-     * Called by [InterventionScheduler] at each checkpoint.
      */
     suspend fun triggerIntervention(
         sessionId: String,
         triggerType: String,
         checkpointMinutes: Int? = null
     ) {
+        isHeadsUpActive = false
+        val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        nm.cancel(SOFT_WARNING_NOTIFICATION_ID)
+        nm.cancel(HEADS_UP_NOTIFICATION_ID)
+
         val session = sessionRepository.getActiveSession(sessionId) ?: return
         
-        // ONLY trigger interventions if the user has completed onboarding
         val onboarding = onboardingResponseDao.getOnboardingResponse(session.deviceId)
         if (onboarding == null) {
             Log.i(TAG, "Skipping intervention: Onboarding not completed yet.")
@@ -143,7 +165,6 @@ class InterventionEngine(
         val studyArm = studyArmManager.getRandomArm()
         val milestoneMinutes = checkpointMinutes ?: 0
 
-        // Pull personalization tokens if needed (for Identity arm)
         val personalization = if (studyArm == StudyArm.IDENTITY) {
             mapOf(
                 "Trait 1" to onboarding.trait1,
@@ -196,10 +217,6 @@ class InterventionEngine(
         )
     }
 
-    /**
-     * Called when the overlay completes after the 12-second intervention.
-     * Updates end timestamp and user_action based on whether the session is still active.
-     */
     fun onInterventionCompleted(interventionId: String, sessionId: String, action: String) {
         scope.launch {
             val endTimestamp = System.currentTimeMillis()
@@ -214,7 +231,7 @@ class InterventionEngine(
 
     companion object {
         private const val TAG = "InterventionEngine"
-        private const val SOFT_WARNING_CHANNEL_ID = "soft_warning_intervention"
+        private const val SOFT_WARNING_CHANNEL_ID = "soft_warning_intervention_v3"
         private const val HEADS_UP_CHANNEL_ID = "heads_up_intervention"
         private const val SOFT_WARNING_NOTIFICATION_ID = 1000
         private const val HEADS_UP_NOTIFICATION_ID = 1001
