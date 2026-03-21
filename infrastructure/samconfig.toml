@@ -1,14 +1,14 @@
 version = 0.1
 
 [dev.deploy.parameters]
-stack_name = "doomscrolling-ingestion-public"
+stack_name = "doomscrolling-ingestion-public-v2"
 resolve_s3 = true
-s3_prefix = "doomscrolling-ingestion-public"
+s3_prefix = "doomscrolling-ingestion-public-v2"
 profile = "study"
 confirm_changeset = true
 capabilities = "CAPABILITY_IAM"
 image_repositories = []
-parameter_overrides = "AllowedClientIpCidrParam=\"66.219.235.149/32\" DbNameParam=\"doomscrolling\" DbUserParam=\"doom_user\""
+parameter_overrides = "AllowedClientIpCidrParam=\"66.219.235.149/32\" AllowedClientIpCidrParam2=\"128.187.116.2/32\" DbNameParam=\"doomscrolling\" DbUserParam=\"doom_user\" BackupRetentionDaysParam=\"7\" EnableDeletionProtectionParam=\"true\""
 
 [dev.global.parameters]
 region = "us-west-2"

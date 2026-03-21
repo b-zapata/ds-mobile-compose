@@ -47,7 +47,8 @@ Globals:
       - x86_64
 
 Conditions:
-  DeletionProtectionEnabled: !Equals [!Ref EnableDeletionProtectionParam, "true"]
+  DeletionProtectionEnabled:
+    !Equals [!Ref EnableDeletionProtectionParam, "true"]
 
 Resources:
   Vpc:
@@ -263,4 +264,3 @@ Outputs:
   PostgresEndpoint:
     Description: RDS PostgreSQL endpoint (host)
     Value: !GetAtt PostgresInstance.Endpoint.Address
-

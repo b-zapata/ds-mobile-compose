@@ -1,9 +1,13 @@
 package study.doomscrolling.app.ui.screens
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -12,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import study.doomscrolling.app.services.ForegroundAppDetector
 
 @Composable
@@ -20,11 +25,23 @@ fun PermissionsScreen(
 ) {
     val context = LocalContext.current
     var hasUsagePermission by remember { mutableStateOf(false) }
-    var hasOverlayPermission by remember { mutableStateOf(hasOverlayPermission(context)) }
+    var hasOverlayPermission by remember { mutableStateOf(false) }
+    var hasNotificationPermission by remember { mutableStateOf(false) }
+
+    val notificationLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        hasNotificationPermission = isGranted
+    }
 
     LaunchedEffect(Unit) {
         hasUsagePermission = ForegroundAppDetector.hasUsageStatsPermission(context)
-        hasOverlayPermission = hasOverlayPermission(context)
+        hasOverlayPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) Settings.canDrawOverlays(context) else true
+        hasNotificationPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+        } else {
+            true
+        }
     }
 
     Column(
@@ -40,9 +57,7 @@ fun PermissionsScreen(
         )
         Spacer(modifier = Modifier.height(16.dp))
         Text(
-            text = "To participate in this study, the app needs:\n\n" +
-                "- Usage access permission (to reconstruct app sessions)\n" +
-                "- Display over other apps permission (to show brief intervention overlays)",
+            text = "To participate in this study, the app needs these three permissions:",
             style = MaterialTheme.typography.bodyMedium,
             textAlign = TextAlign.Center
         )
@@ -54,7 +69,7 @@ fun PermissionsScreen(
             onOpenSettings = { openUsageAccessSettings(context) }
         )
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
         PermissionStatusItem(
             label = "Display over other apps",
@@ -62,29 +77,39 @@ fun PermissionsScreen(
             onOpenSettings = { openOverlaySettings(context) }
         )
 
+        Spacer(modifier = Modifier.height(16.dp))
+
+        PermissionStatusItem(
+            label = "Notifications",
+            isGranted = hasNotificationPermission,
+            onOpenSettings = {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                }
+            }
+        )
+
         Spacer(modifier = Modifier.height(48.dp))
 
         Button(
             onClick = {
                 hasUsagePermission = ForegroundAppDetector.hasUsageStatsPermission(context)
-                hasOverlayPermission = hasOverlayPermission(context)
+                hasOverlayPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) Settings.canDrawOverlays(context) else true
+                hasNotificationPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+                } else {
+                    true
+                }
             }
         ) {
-            Text("Refresh permissions status")
+            Text("Refresh status")
         }
 
         Spacer(modifier = Modifier.height(32.dp))
 
         Button(
-            enabled = hasUsagePermission && hasOverlayPermission,
-            onClick = {
-                // Final re-check
-                hasUsagePermission = ForegroundAppDetector.hasUsageStatsPermission(context)
-                hasOverlayPermission = hasOverlayPermission(context)
-                if (hasUsagePermission && hasOverlayPermission) {
-                    onComplete()
-                }
-            }
+            enabled = hasUsagePermission && hasOverlayPermission && hasNotificationPermission,
+            onClick = { onComplete() }
         ) {
             Text("Continue")
         }
@@ -108,16 +133,8 @@ private fun PermissionStatusItem(
             onClick = onOpenSettings,
             enabled = !isGranted
         ) {
-            Text(if (isGranted) "Permission Granted" else "Open settings")
+            Text(if (isGranted) "Permission Granted" else "Grant Permission")
         }
-    }
-}
-
-private fun hasOverlayPermission(context: android.content.Context): Boolean {
-    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-        Settings.canDrawOverlays(context)
-    } else {
-        true
     }
 }
 

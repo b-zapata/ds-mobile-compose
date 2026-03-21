@@ -1,10 +1,15 @@
 package study.doomscrolling.app.domain.intervention
 
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.content.Context
 import android.util.Log
+import androidx.core.app.NotificationCompat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import study.doomscrolling.app.R
 import study.doomscrolling.app.data.dao.InterventionDao
 import study.doomscrolling.app.data.dao.OnboardingResponseDao
 import study.doomscrolling.app.data.entities.InterventionEntity
@@ -21,6 +26,7 @@ import java.util.UUID
  * intervention events, and shows the prompt overlay when configured.
  */
 class InterventionEngine(
+    private val context: Context,
     private val sessionRepository: SessionRepository,
     private val interventionDao: InterventionDao,
     private val onboardingResponseDao: OnboardingResponseDao,
@@ -31,6 +37,10 @@ class InterventionEngine(
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var monitoringJob: kotlinx.coroutines.Job? = null
+
+    init {
+        createNotificationChannels()
+    }
 
     /**
      * Start intervention scheduling for this session. Call when session starts.
@@ -50,6 +60,66 @@ class InterventionEngine(
         monitoringJob?.cancel()
         monitoringJob = null
         Log.i(TAG, "Intervention scheduler stopped")
+    }
+
+    /**
+     * Displays a subtle, silent notification 60 seconds before an intervention.
+     */
+    fun showSoftWarningNotification(milestoneMinutes: Int) {
+        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val notification = NotificationCompat.Builder(context, SOFT_WARNING_CHANNEL_ID)
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setContentTitle("Reflection point approaching")
+            .setContentText("A reflection pause will occur in 1 minute.")
+            .setPriority(NotificationCompat.PRIORITY_LOW) // Silent, no peek
+            .setAutoCancel(true)
+            .build()
+
+        notificationManager.notify(SOFT_WARNING_NOTIFICATION_ID, notification)
+    }
+
+    /**
+     * Displays a high-priority heads-up notification to warn the user that an intervention is coming.
+     */
+    fun showHeadsUpNotification(milestoneMinutes: Int) {
+        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val notification = NotificationCompat.Builder(context, HEADS_UP_CHANNEL_ID)
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setContentTitle("Study Pause Coming")
+            .setContentText("A reflection pause will start in 10 seconds.")
+            .setPriority(NotificationCompat.PRIORITY_HIGH) // Slides down (heads-up)
+            .setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setAutoCancel(true)
+            .build()
+
+        notificationManager.notify(HEADS_UP_NOTIFICATION_ID, notification)
+    }
+
+    private fun createNotificationChannels() {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            
+            // Channel 1: Soft Warning (Silent)
+            val softChannel = NotificationChannel(
+                SOFT_WARNING_CHANNEL_ID,
+                "Study Reflection Warnings",
+                NotificationManager.IMPORTANCE_LOW
+            ).apply {
+                description = "Silent alerts 1 minute before a study pause"
+            }
+            
+            // Channel 2: Heads-Up (Slide down)
+            val headsUpChannel = NotificationChannel(
+                HEADS_UP_CHANNEL_ID,
+                "Heads-Up Notifications",
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "Slide-down warnings 10 seconds before a study pause"
+            }
+            
+            notificationManager.createNotificationChannel(softChannel)
+            notificationManager.createNotificationChannel(headsUpChannel)
+        }
     }
 
     /**
@@ -144,5 +214,9 @@ class InterventionEngine(
 
     companion object {
         private const val TAG = "InterventionEngine"
+        private const val SOFT_WARNING_CHANNEL_ID = "soft_warning_intervention"
+        private const val HEADS_UP_CHANNEL_ID = "heads_up_intervention"
+        private const val SOFT_WARNING_NOTIFICATION_ID = 1000
+        private const val HEADS_UP_NOTIFICATION_ID = 1001
     }
 }

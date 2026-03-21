@@ -98,7 +98,7 @@ async function sendResponse(
   status: "SUCCESS" | "FAILED",
   reason: string,
   data: Record<string, any>,
-  event: CloudFormationEvent
+  event: CloudFormationEvent,
 ) {
   const body = JSON.stringify({
     Status: status,
@@ -108,16 +108,20 @@ async function sendResponse(
     RequestId: event.RequestId,
     LogicalResourceId: event.LogicalResourceId,
     NoEcho: false,
-    Data: data
+    Data: data,
   });
 
-  console.log(`[sendResponse] Starting CloudFormation callback to ${responseUrl}`);
+  console.log(
+    `[sendResponse] Starting CloudFormation callback to ${responseUrl}`,
+  );
   console.log(`[sendResponse] Status: ${status}, Reason: ${reason}`);
 
   await new Promise<void>((resolve, reject) => {
     const url = new URL(responseUrl);
     const timeoutHandle = setTimeout(() => {
-      console.error(`[sendResponse] TIMEOUT after 5s waiting for CloudFormation response`);
+      console.error(
+        `[sendResponse] TIMEOUT after 5s waiting for CloudFormation response`,
+      );
       req.destroy();
       reject(new Error("CloudFormation callback timeout (5s)"));
     }, 5000);
@@ -129,14 +133,20 @@ async function sendResponse(
         method: "PUT",
         headers: {
           "content-type": "",
-          "content-length": Buffer.byteLength(body)
-        }
+          "content-length": Buffer.byteLength(body),
+        },
       },
       (res) => {
-        console.log(`[sendResponse] Got response from CloudFormation: status ${res.statusCode}`);
+        console.log(
+          `[sendResponse] Got response from CloudFormation: status ${res.statusCode}`,
+        );
         clearTimeout(timeoutHandle);
         if ((res.statusCode ?? 500) >= 400) {
-          reject(new Error(`Failed to send CloudFormation response: ${res.statusCode}`));
+          reject(
+            new Error(
+              `Failed to send CloudFormation response: ${res.statusCode}`,
+            ),
+          );
           return;
         }
         res.on("data", () => undefined);
@@ -144,7 +154,7 @@ async function sendResponse(
           console.log(`[sendResponse] Response ended, resolving`);
           resolve();
         });
-      }
+      },
     );
 
     req.on("error", (err) => {
@@ -167,20 +177,30 @@ function getEnvOrThrow(name: string): string {
   return v;
 }
 
-export const handler = async (event: CloudFormationEvent): Promise<{ ok: boolean; mode: string } | void> => {
+export const handler = async (
+  event: CloudFormationEvent,
+): Promise<{ ok: boolean; mode: string } | void> => {
   console.log(`[handler] Starting with event:`, JSON.stringify(event, null, 2));
 
   const responseUrl = event.ResponseURL;
   const isCloudFormationInvoke = Boolean(responseUrl);
   const requestType = event.RequestType ?? "Update";
 
-  console.log(`[handler] isCloudFormationInvoke=${isCloudFormationInvoke}, requestType=${requestType}`);
+  console.log(
+    `[handler] isCloudFormationInvoke=${isCloudFormationInvoke}, requestType=${requestType}`,
+  );
 
   try {
     if (requestType === "Delete") {
       console.log(`[handler] Handling Delete request`);
       if (isCloudFormationInvoke && responseUrl) {
-        await sendResponse(responseUrl, "SUCCESS", "Delete: nothing to do", {}, event);
+        await sendResponse(
+          responseUrl,
+          "SUCCESS",
+          "Delete: nothing to do",
+          {},
+          event,
+        );
       }
       return;
     }
@@ -191,7 +211,10 @@ export const handler = async (event: CloudFormationEvent): Promise<{ ok: boolean
       database: getEnvOrThrow("DB_NAME"),
       user: getEnvOrThrow("DB_USER"),
       password: getEnvOrThrow("DB_PASSWORD"),
-      ssl: getEnvOrThrow("DB_SSL") === "true" ? { rejectUnauthorized: false } : undefined
+      ssl:
+        getEnvOrThrow("DB_SSL") === "true"
+          ? { rejectUnauthorized: false }
+          : undefined,
     });
 
     try {
@@ -208,12 +231,21 @@ export const handler = async (event: CloudFormationEvent): Promise<{ ok: boolean
 
       if (isCloudFormationInvoke && responseUrl) {
         console.log(`[handler] Sending CloudFormation SUCCESS response`);
-        await sendResponse(responseUrl, "SUCCESS", "Schema applied", { ok: true }, event);
+        await sendResponse(
+          responseUrl,
+          "SUCCESS",
+          "Schema applied",
+          { ok: true },
+          event,
+        );
         return;
       }
       return { ok: true, mode: "direct" };
     } catch (e: any) {
-      console.error(`[handler] Error during schema setup: ${e?.message ?? String(e)}`, e?.stack);
+      console.error(
+        `[handler] Error during schema setup: ${e?.message ?? String(e)}`,
+        e?.stack,
+      );
       try {
         await client.query("ROLLBACK");
         console.log(`[handler] Rolled back transaction`);
@@ -227,7 +259,7 @@ export const handler = async (event: CloudFormationEvent): Promise<{ ok: boolean
           "FAILED",
           `Schema setup failed: ${e?.message ?? String(e)}`,
           { ok: false },
-          event
+          event,
         );
         return;
       }
@@ -241,4 +273,3 @@ export const handler = async (event: CloudFormationEvent): Promise<{ ok: boolean
     throw e;
   }
 };
-

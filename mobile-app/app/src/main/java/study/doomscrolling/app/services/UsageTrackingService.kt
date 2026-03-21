@@ -43,6 +43,7 @@ class UsageTrackingService : Service() {
     private val promptManager by lazy { PromptManager(applicationContext) }
     private val interventionEngine by lazy {
         InterventionEngine(
+            context = applicationContext,
             sessionRepository = repository,
             interventionDao = db.interventionDao(),
             onboardingResponseDao = db.onboardingResponseDao(),
@@ -52,6 +53,13 @@ class UsageTrackingService : Service() {
         ).also { engine ->
             InterventionCompletionNotifier.listener = { interventionId, sessionId, action ->
                 engine.onInterventionCompleted(interventionId, sessionId, action)
+                
+                // BUG FIX: If the user chose to close the app, force the session to end immediately
+                // instead of waiting for the MISMATCH_THRESHOLD polling cycles.
+                if (action == "closed_app") {
+                    Log.i(TAG, "User closed app via intervention; forcing session end.")
+                    endSession()
+                }
             }
         }
     }

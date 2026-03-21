@@ -3,8 +3,12 @@ package study.doomscrolling.app.ui.overlay
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.content.Context
 import android.content.Intent
 import android.graphics.PixelFormat
+import android.media.AudioAttributes
+import android.media.AudioFocusRequest
+import android.media.AudioManager
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -40,6 +44,10 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
     private var currentInterventionId: String? = null
     private var currentSessionId: String? = null
     
+    // Audio Focus management to mute other apps
+    private var audioManager: AudioManager? = null
+    private var audioFocusRequest: AudioFocusRequest? = null
+
     // Manage timer in the service to ensure it ticks reliably
     private val secondsLeftFlow = MutableStateFlow(12)
     private val handler = Handler(Looper.getMainLooper())
@@ -57,6 +65,7 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
         super.onCreate()
         savedStateRegistryController.performRestore(null)
         windowManager = getSystemService(WINDOW_SERVICE) as? WindowManager
+        audioManager = getSystemService(Context.AUDIO_SERVICE) as? AudioManager
         createNotificationChannel()
     }
 
@@ -72,6 +81,8 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
             startForeground(NOTIFICATION_ID, notification)
         }
         
+        requestMute()
+        
         // Reset and start timer
         secondsLeftFlow.value = 12
         handler.removeCallbacks(timerRunnable)
@@ -81,8 +92,38 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
         return super.onStartCommand(intent, flags, startId)
     }
 
+    private fun requestMute() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val playbackAttributes = AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_ASSISTANCE_NAVIGATION_GUIDANCE)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                .build()
+            
+            audioFocusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
+                .setAudioAttributes(playbackAttributes)
+                .setAcceptsDelayedFocusGain(false)
+                .setOnAudioFocusChangeListener { /* handle changes if needed */ }
+                .build()
+            
+            audioFocusRequest?.let { audioManager?.requestAudioFocus(it) }
+        } else {
+            @Suppress("DEPRECATION")
+            audioManager?.requestAudioFocus(null, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
+        }
+        Log.i(TAG, "Audio focus requested (muting/ducking other apps)")
+    }
+
+    private fun releaseMute() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            audioFocusRequest?.let { audioManager?.abandonAudioFocusRequest(it) }
+        } else {
+            @Suppress("DEPRECATION")
+            audioManager?.abandonAudioFocus(null)
+        }
+        Log.i(TAG, "Audio focus released")
+    }
+
     private fun createNotificationChannel() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val channel = NotificationChannel(
             CHANNEL_ID,
             getString(R.string.notification_channel_overlay_name),
@@ -150,6 +191,8 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
         } else {
             Log.w(TAG, "Missing intervention/session id on overlay completion")
         }
+        
+        releaseMute()
         removeOverlay()
         Log.i(TAG, "Prompt overlay dismissed with action: $action")
         stopSelf()
@@ -168,6 +211,7 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
     }
 
     override fun onDestroy() {
+        releaseMute()
         removeOverlay()
         super.onDestroy()
     }

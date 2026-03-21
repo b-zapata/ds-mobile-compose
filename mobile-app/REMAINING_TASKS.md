@@ -102,6 +102,15 @@
   - Rapidly switch apps, lock/unlock phone, and ensure:
     - No duplicate or “stuck” interventions.
     - Session merging + minimum duration logic still behaves correctly.
+- **Debugging & Bug Fixes**
+  - [DONE] Fix: After closing the app once through intervention, subsequent opens show no interventions.
+  - Implement: Friction prompts (require interaction instead of just waiting).
+  - Optimize: Improve intervention trigger latency (reduce "slow to show up" delay).
+- **Notification Vignette**
+  - [DONE] Implement a "heads up" notification that slides from the top before an intervention.
+  - Timing strategy: 10 seconds before the milestone.
+- **Audio Management**
+  - Implement muting of all audio/target apps during the 12-second intervention overlay to maximize prompt impact.
 
 ### 10. Upload worker testing (nightly + manual)
 - **Manual trigger (debug)**

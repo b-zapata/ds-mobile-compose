@@ -130,7 +130,8 @@ fun DashboardScreen(
             ChecklistItem(
                 title = "Grant phone permissions",
                 isCompleted = hasPermissions,
-                onClick = if (hasConsented && !hasPermissions) onNavigateToPermissions else null
+                // DEBUG: Always clickable for testing, even if completed
+                onClick = onNavigateToPermissions
             )
             ChecklistItem(
                 title = "Check eligibility",

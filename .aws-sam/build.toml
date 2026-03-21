@@ -24,4 +24,24 @@ Target = "es2020"
 
 
 
+
+
+[function_build_definitions.e64beedc-fbbd-4892-a16c-1d33fda1e1cb]
+codeuri = "C:\\Users\\bzapa\\OneDrive\\Documents\\GitHub\\ds-mobile-compose\\server\\ingestion"
+runtime = "nodejs20.x"
+architecture = "x86_64"
+handler = "schemaSetup.handler"
+manifest_hash = ""
+packagetype = "Zip"
+functions = ["SchemaSetupFunction"]
+
+[function_build_definitions.e64beedc-fbbd-4892-a16c-1d33fda1e1cb.metadata]
+BuildMethod = "esbuild"
+
+[function_build_definitions.e64beedc-fbbd-4892-a16c-1d33fda1e1cb.metadata.BuildProperties]
+EntryPoints = ["src/schemaSetup.ts"]
+Minify = false
+Sourcemap = true
+Target = "es2020"
+
 [layer_build_definitions]
