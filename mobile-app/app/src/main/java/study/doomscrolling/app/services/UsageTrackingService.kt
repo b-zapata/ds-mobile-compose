@@ -122,6 +122,15 @@ class UsageTrackingService : Service() {
                     if (!ForegroundAppDetector.hasUsageStatsPermission(this)) break
                     val foreground = detector.getCurrentForegroundPackage()
                     val session = currentSession
+                    
+                    // Logic for BUG #1 and #2: If a heads-up is pending, we are MORE STUBBORN about 
+                    // keeping the session alive even if the foreground app briefly changes.
+                    val currentThreshold = if (interventionEngine.isHeadsUpPending()) {
+                        MISMATCH_THRESHOLD_STUBBORN
+                    } else {
+                        MISMATCH_THRESHOLD
+                    }
+
                     when {
                         foreground == null -> { /* ignore transient detection */ }
                         foreground == session?.packageName -> {
@@ -139,7 +148,8 @@ class UsageTrackingService : Service() {
                         }
                         else -> {
                             mismatchCount++
-                            if (mismatchCount >= MISMATCH_THRESHOLD) {
+                            if (mismatchCount >= currentThreshold) {
+                                Log.i(TAG, "Ending session due to package mismatch: $foreground")
                                 endSession()
                                 mismatchCount = 0
                             }
@@ -177,8 +187,10 @@ class UsageTrackingService : Service() {
         private const val POLL_INTERVAL_MS = 2000L
         /** Consecutive polls the foreground must differ from session before ending (avoids activity transition glitches). */
         private const val MISMATCH_THRESHOLD = 3
+        /** Threshold during the 10s heads-up window to prevent notification interactions from killing the session. */
+        private const val MISMATCH_THRESHOLD_STUBBORN = 8
 
-        /** System/overlay packages to ignore so sessions don't end on permission dialogs, notification shade, etc. Launcher excluded so going home can end session after 3 cycles. */
+        /** System/overlay packages to ignore so sessions don't end on permission dialogs, notification shade, etc. */
         private val SYSTEM_PACKAGES = setOf(
             "com.android.systemui",
             "com.google.android.permissioncontroller",

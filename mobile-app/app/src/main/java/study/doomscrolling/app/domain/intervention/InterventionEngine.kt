@@ -38,7 +38,6 @@ class InterventionEngine(
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var monitoringJob: kotlinx.coroutines.Job? = null
     
-    // Track if a heads-up is currently active to prevent session-ending during the 10s window
     @Volatile
     private var isHeadsUpActive: Boolean = false
 
@@ -49,7 +48,7 @@ class InterventionEngine(
     fun isHeadsUpPending(): Boolean = isHeadsUpActive
 
     /**
-     * Start intervention scheduling for this session. Call when session starts.
+     * Start intervention scheduling for this session.
      */
     fun startMonitoring(sessionId: String, packageName: String, sessionStartMs: Long) {
         stopMonitoring()
@@ -60,7 +59,7 @@ class InterventionEngine(
     }
 
     /**
-     * Cancel intervention scheduling. Call when session ends.
+     * Cancel intervention scheduling.
      */
     fun stopMonitoring() {
         monitoringJob?.cancel()
@@ -73,7 +72,7 @@ class InterventionEngine(
     }
 
     /**
-     * Displays a notification 60 seconds before an intervention.
+     * T-minus 60s: High-priority vignette, but silent.
      */
     fun showSoftWarningNotification(milestoneMinutes: Int) {
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -81,11 +80,9 @@ class InterventionEngine(
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setContentTitle("Reflection point approaching")
             .setContentText("A reflection pause will occur in 1 minute.")
-            .setPriority(NotificationCompat.PRIORITY_MAX) // Max priority for top-level visibility
-            .setCategory(NotificationCompat.CATEGORY_EVENT)
-            .setSortKey("0") // Hint to sort at the top
-            .setShowWhen(true)
-            .setWhen(System.currentTimeMillis())
+            .setPriority(NotificationCompat.PRIORITY_HIGH) 
+            .setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setFullScreenIntent(null, true) // Force peek/vignette
             .setAutoCancel(true)
             .build()
 
@@ -93,12 +90,11 @@ class InterventionEngine(
     }
 
     /**
-     * Displays a high-priority heads-up notification to warn the user that an intervention is coming.
+     * T-minus 10s: High-priority vignette with alert sound.
      */
     fun showHeadsUpNotification(milestoneMinutes: Int) {
         isHeadsUpActive = true
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        
         notificationManager.cancel(SOFT_WARNING_NOTIFICATION_ID)
 
         val notification = NotificationCompat.Builder(context, HEADS_UP_CHANNEL_ID)
@@ -107,6 +103,7 @@ class InterventionEngine(
             .setContentText("A reflection pause will start in 10 seconds.")
             .setPriority(NotificationCompat.PRIORITY_HIGH) 
             .setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setFullScreenIntent(null, true) // Force peek/vignette
             .setAutoCancel(true)
             .build()
 
@@ -117,17 +114,19 @@ class InterventionEngine(
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
             val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             
+            // v5 Soft Channel: High Importance (Peeking) but SILENT
             val softChannel = NotificationChannel(
                 SOFT_WARNING_CHANNEL_ID,
                 "Study Reflection Warnings",
                 NotificationManager.IMPORTANCE_HIGH 
             ).apply {
-                description = "Status bar alerts 1 minute before a study pause"
+                description = "Silent peeking alerts 1 minute before a study pause"
                 enableLights(false)
                 enableVibration(false)
                 setSound(null, null)
             }
             
+            // v5 Heads-Up Channel: High Importance (Peeking) with SOUND
             val headsUpChannel = NotificationChannel(
                 HEADS_UP_CHANNEL_ID,
                 "Heads-Up Notifications",
@@ -141,9 +140,6 @@ class InterventionEngine(
         }
     }
 
-    /**
-     * Verify session is still active, then persist intervention and log.
-     */
     suspend fun triggerIntervention(
         sessionId: String,
         triggerType: String,
@@ -155,7 +151,6 @@ class InterventionEngine(
         nm.cancel(HEADS_UP_NOTIFICATION_ID)
 
         val session = sessionRepository.getActiveSession(sessionId) ?: return
-        
         val onboarding = onboardingResponseDao.getOnboardingResponse(session.deviceId)
         if (onboarding == null) {
             Log.i(TAG, "Skipping intervention: Onboarding not completed yet.")
@@ -202,14 +197,12 @@ class InterventionEngine(
             createdAt = now
         )
         interventionDao.insertIntervention(entity)
-        Log.i(TAG, "Intervention triggered" + (checkpointMinutes?.let { " at checkpoint $it minutes" } ?: ""))
 
         val prompt = Prompt(
             id = "arm_${studyArm.name.lowercase()}_${milestoneMinutes}_${promptInstance.promptVariant}",
             text = promptInstance.text,
             category = "milestone_$milestoneMinutes"
         )
-        Log.i(TAG, "Prompt selected")
         promptManager.showPrompt(
             prompt = prompt,
             interventionId = interventionId,
@@ -231,8 +224,8 @@ class InterventionEngine(
 
     companion object {
         private const val TAG = "InterventionEngine"
-        private const val SOFT_WARNING_CHANNEL_ID = "soft_warning_intervention_v3"
-        private const val HEADS_UP_CHANNEL_ID = "heads_up_intervention"
+        private const val SOFT_WARNING_CHANNEL_ID = "soft_warning_intervention_v5"
+        private const val HEADS_UP_CHANNEL_ID = "heads_up_intervention_v5"
         private const val SOFT_WARNING_NOTIFICATION_ID = 1000
         private const val HEADS_UP_NOTIFICATION_ID = 1001
     }
