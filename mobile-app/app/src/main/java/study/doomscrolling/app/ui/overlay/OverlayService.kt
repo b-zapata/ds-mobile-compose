@@ -6,9 +6,13 @@ import android.app.NotificationManager
 import android.content.Intent
 import android.graphics.PixelFormat
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import android.view.Gravity
 import android.view.WindowManager
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.ComposeView
 import androidx.core.app.NotificationCompat
 import androidx.lifecycle.LifecycleService
@@ -17,6 +21,7 @@ import androidx.savedstate.SavedStateRegistry
 import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
+import kotlinx.coroutines.flow.MutableStateFlow
 import study.doomscrolling.app.R
 import study.doomscrolling.app.domain.intervention.InterventionCompletionNotifier
 
@@ -34,27 +39,46 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
     private var windowManager: WindowManager? = null
     private var currentInterventionId: String? = null
     private var currentSessionId: String? = null
+    
+    // Manage timer in the service to ensure it ticks reliably
+    private val secondsLeftFlow = MutableStateFlow(12)
+    private val handler = Handler(Looper.getMainLooper())
+    private val timerRunnable = object : Runnable {
+        override fun run() {
+            if (secondsLeftFlow.value > 0) {
+                secondsLeftFlow.value -= 1
+                Log.d(TAG, "Timer Tick: ${secondsLeftFlow.value}")
+                handler.postDelayed(this, 1000)
+            }
+        }
+    }
 
     override fun onCreate() {
         super.onCreate()
         savedStateRegistryController.performRestore(null)
-        // performAttach() is not called: LifecycleService already attaches the registry.
         windowManager = getSystemService(WINDOW_SERVICE) as? WindowManager
         createNotificationChannel()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        val promptText = intent?.getStringExtra(EXTRA_PROMPT_TEXT) ?: return START_NOT_STICKY
+        val promptText = intent?.getStringExtra(EXTRA_PROMPT_TEXT) ?: return super.onStartCommand(intent, flags, startId)
         currentInterventionId = intent.getStringExtra(EXTRA_INTERVENTION_ID)
         currentSessionId = intent.getStringExtra(EXTRA_SESSION_ID)
+        
         val notification = buildNotification()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             startForeground(NOTIFICATION_ID, notification, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
         } else {
             startForeground(NOTIFICATION_ID, notification)
         }
+        
+        // Reset and start timer
+        secondsLeftFlow.value = 12
+        handler.removeCallbacks(timerRunnable)
+        handler.postDelayed(timerRunnable, 1000)
+        
         showOverlay(promptText)
-        return START_NOT_STICKY
+        return super.onStartCommand(intent, flags, startId)
     }
 
     private fun createNotificationChannel() {
@@ -87,31 +111,25 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
                 @Suppress("DEPRECATION")
                 WindowManager.LayoutParams.TYPE_PHONE
             },
-            0,
+            WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.CENTER
         }
+        
         val composeView = ComposeView(this).apply {
             setViewTreeLifecycleOwner(this@OverlayService)
             setViewTreeSavedStateRegistryOwner(this@OverlayService)
             setContent {
+                val secondsLeft by secondsLeftFlow.collectAsState()
                 PromptOverlayView(
                     promptText = promptText,
+                    secondsLeft = secondsLeft,
                     onContinue = {
-                        val interventionId = currentInterventionId
-                        val sessionId = currentSessionId
-                        if (interventionId != null && sessionId != null) {
-                            InterventionCompletionNotifier.notifyCompleted(
-                                interventionId = interventionId,
-                                sessionId = sessionId
-                            )
-                        } else {
-                            Log.w(TAG, "Missing intervention/session id on overlay completion")
-                        }
-                        removeOverlay()
-                        Log.i(TAG, "Prompt overlay dismissed")
-                        stopSelf()
+                        handleCompletion(action = "continued_session")
+                    },
+                    onCloseApp = {
+                        handleCompletion(action = "closed_app")
                     }
                 )
             }
@@ -120,7 +138,25 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
         wm.addView(composeView, layoutParams)
     }
 
+    private fun handleCompletion(action: String) {
+        val interventionId = currentInterventionId
+        val sessionId = currentSessionId
+        if (interventionId != null && sessionId != null) {
+            InterventionCompletionNotifier.notifyCompleted(
+                interventionId = interventionId,
+                sessionId = sessionId,
+                action = action
+            )
+        } else {
+            Log.w(TAG, "Missing intervention/session id on overlay completion")
+        }
+        removeOverlay()
+        Log.i(TAG, "Prompt overlay dismissed with action: $action")
+        stopSelf()
+    }
+
     private fun removeOverlay() {
+        handler.removeCallbacks(timerRunnable)
         overlayView?.let { view ->
             try {
                 windowManager?.removeView(view)

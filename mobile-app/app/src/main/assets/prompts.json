@@ -1,38 +1,38 @@
 {
   "identity": {
     "0": [
-      "Take a breath and remember [Trait 1]. Is this scroll aligned with that part of you?",
-      "Think about [Goal 1]. Does staying here help you move toward it?"
+      "Take a breath and remember your trait of '[Trait 1]'. Is this scroll aligned with that part of you?",
+      "Think about your goal of '[Goal 1]'. Does staying here help you move toward it?"
     ],
     "10": [
-      "You've been here for a while. Someone with [Trait 2] might choose differently right now.",
-      "If you lived fully as [Role 1] today, what would you do next instead of scrolling?"
+      "You've been here for a while. Someone with your trait of '[Trait 2]' might choose differently right now.",
+      "If you lived fully as your role of '[Role 1]' today, what would you do next instead of scrolling?"
     ],
     "15": [
-      "Picture the version of you who truly embodies [Trait 3]. What would they do now?",
-      "Is this helping you be the kind of [Role 2] you want to be?"
+      "Picture the version of you who truly embodies your trait of '[Trait 3]'. What would they do now?",
+      "Is this helping you be the kind of '[Role 2]' you want to be?"
     ],
     "20": [
-      "Long scrolls can pull you away from [Goal 2]. Is there a small step toward it you can take now?",
-      "Imagine looking back tonight as [Role 3]. How do you wish you had spent this time?"
+      "Long scrolls can pull you away from your passion for '[Goal 2]'. Is there a small step toward it you can take now?",
+      "Imagine looking back tonight as your role of '[Role 3]'. How do you wish you had spent this time?"
     ]
   },
   "mindfulness": {
     "0": [
-      "Notice your body. Where do you feel [Stress 1] right now?",
-      "Gently bring your attention to your [Breath]. Follow three full inhales and exhales."
+      "Notice your body. Where do you feel tension right now?",
+      "Gently bring your attention to your breath. Follow three full inhales and exhales."
     ],
     "10": [
-      "Imagine you are in your calming place: [Place]. Let that scene fill your mind for a few moments.",
-      "Visualize your [Mental Color] slowly filling the screen and softening your attention."
+      "Imagine you are in a calming, quiet place. Let that scene fill your mind for a few moments.",
+      "Visualize a restful, quiet color slowly filling the screen and softening your attention."
     ],
     "15": [
-      "Pause and feel one simple sensation: [Tactile Recall]. Stay with it for three breaths.",
+      "Pause and imagine feeling a soothing texture. Stay with it for three breaths.",
       "Notice the pull to keep scrolling. Can you rest your attention on your body instead, just for a moment?"
     ],
     "20": [
-      "Feel the weight of your body as a [Gravity Anchor] holding you in place, not the feed.",
-      "Bring awareness to [Limb Symmetry]—how both sides of your body rest right now."
+      "Feel the weight of your body holding you in place, not the feed.",
+      "Bring awareness to your body—how both sides of your body rest right now."
     ]
   },
   "friction": {
@@ -45,7 +45,7 @@
       "Move your attention from your toes up to your head, naming each body part before continuing."
     ],
     "15": [
-      "Imagine tensing and then relaxing a distant muscle: [Distant Muscle]. Notice the shift before moving on.",
+      "Imagine tensing and then relaxing your muscles. Notice the shift before moving on.",
       "Close your eyes for ten slow heartbeats before deciding what to tap next."
     ],
     "20": [
@@ -72,4 +72,3 @@
     ]
   }
 }
-

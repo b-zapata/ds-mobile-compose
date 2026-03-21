@@ -42,9 +42,16 @@ class UsageTrackingService : Service() {
     private val promptEngine by lazy { PromptEngine(promptRepository, promptRenderer) }
     private val promptManager by lazy { PromptManager(applicationContext) }
     private val interventionEngine by lazy {
-        InterventionEngine(repository, db.interventionDao(), studyArmManager, promptEngine, promptManager).also { engine ->
-            InterventionCompletionNotifier.listener = { interventionId, sessionId ->
-                engine.onInterventionCompleted(interventionId, sessionId)
+        InterventionEngine(
+            sessionRepository = repository,
+            interventionDao = db.interventionDao(),
+            onboardingResponseDao = db.onboardingResponseDao(),
+            studyArmManager = studyArmManager,
+            promptEngine = promptEngine,
+            promptManager = promptManager
+        ).also { engine ->
+            InterventionCompletionNotifier.listener = { interventionId, sessionId, action ->
+                engine.onInterventionCompleted(interventionId, sessionId, action)
             }
         }
     }
