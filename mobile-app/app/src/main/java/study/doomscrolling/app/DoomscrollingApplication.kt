@@ -7,15 +7,12 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import java.time.Duration
 import java.time.ZonedDateTime
-import java.util.UUID
 import java.util.concurrent.TimeUnit
 import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
-import study.doomscrolling.app.data.database.AppDatabase
-import study.doomscrolling.app.data.entities.DeviceEntity
 import study.doomscrolling.app.workers.UploadWorker
 
 class DoomscrollingApplication : Application() {
@@ -25,24 +22,8 @@ class DoomscrollingApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         applicationScope.launch {
-            ensureDeviceRegistered()
+            // Device registration is now handled in ConsentViewModel upon user acceptance.
             scheduleResearchDataUploadWorker()
-        }
-    }
-
-    private suspend fun ensureDeviceRegistered() {
-        val db = AppDatabase.getInstance(this)
-        val device = db.deviceDao().getDevice()
-        if (device == null) {
-            db.deviceDao().insertDevice(
-                // Initial device registration without study arm; arm will be assigned during onboarding.
-                DeviceEntity(
-                    deviceId = UUID.randomUUID().toString(),
-                    studyArm = null,
-                    appVersion = BuildConfig.VERSION_NAME ?: "1.0",
-                    enrolledAt = null
-                )
-            )
         }
     }
 

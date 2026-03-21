@@ -6,81 +6,79 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import study.doomscrolling.app.BuildConfig
+import kotlinx.coroutines.withContext
 import study.doomscrolling.app.data.database.AppDatabase
-import study.doomscrolling.app.data.repository.SessionRepository
-import study.doomscrolling.app.domain.study.StudyArm
-import study.doomscrolling.app.domain.study.StudyArmManager
+import study.doomscrolling.app.data.entities.OnboardingResponseEntity
 
-/**
- * ViewModel for onboarding flow. In debug builds it allows overriding the
- * study arm assignment for testing.
- */
 class OnboardingViewModel(application: Application) : AndroidViewModel(application) {
 
-    enum class DebugArmOption(val label: String) {
-        RANDOM("Random"),
-        IDENTITY("Identity"),
-        MINDFULNESS("Mindfulness"),
-        FRICTION("Friction"),
-        BLANK("Blank")
-    }
+    private val db = AppDatabase.getInstance(application)
 
-    var selectedDebugArm: DebugArmOption by mutableStateOf(DebugArmOption.RANDOM)
+    // Identity Tokens
+    var trait1 by mutableStateOf("")
+    var trait2 by mutableStateOf("")
+    var trait3 by mutableStateOf("")
+    var goal1 by mutableStateOf("")
+    var goal2 by mutableStateOf("")
+    var goal3 by mutableStateOf("")
+    var role1 by mutableStateOf("")
+    var role2 by mutableStateOf("")
+    var role3 by mutableStateOf("")
+
+    // Research Scales (1-5)
+    var automaticity by mutableStateOf(3)
+    var utility by mutableStateOf(3)
+    var intention by mutableStateOf(3)
+
+    var isSubmitting by mutableStateOf(false)
         private set
 
-    private val studyArmManager: StudyArmManager by lazy {
-        val db = AppDatabase.getInstance(getApplication())
-        StudyArmManager(db.deviceDao())
-    }
+    fun onTrait1Change(value: String) { trait1 = value }
+    fun onTrait2Change(value: String) { trait2 = value }
+    fun onTrait3Change(value: String) { trait3 = value }
+    fun onGoal1Change(value: String) { goal1 = value }
+    fun onGoal2Change(value: String) { goal2 = value }
+    fun onGoal3Change(value: String) { goal3 = value }
+    fun onRole1Change(value: String) { role1 = value }
+    fun onRole2Change(value: String) { role2 = value }
+    fun onRole3Change(value: String) { role3 = value }
+    fun onAutomaticityChange(value: Int) { automaticity = value }
+    fun onUtilityChange(value: Int) { utility = value }
+    fun onIntentionChange(value: Int) { intention = value }
 
-    private val sessionRepository: SessionRepository by lazy {
-        val db = AppDatabase.getInstance(getApplication())
-        SessionRepository(db.sessionDao(), db.deviceDao())
-    }
-
-    fun onDebugArmSelected(option: DebugArmOption) {
-        selectedDebugArm = option
-    }
-
-    /**
-     * Apply study arm assignment when onboarding completes.
-     *
-     * In production builds this preserves normal randomization.
-     * In debug builds it uses the selected override when not RANDOM.
-     */
-    fun applyStudyArmOverrideIfNeeded() {
+    fun submitOnboarding(onComplete: () -> Unit) {
+        if (isSubmitting) return
+        isSubmitting = true
+        
         viewModelScope.launch {
-            // Ensure device exists first (assignArmIfNeeded creates it if missing), then import baseline.
-            if (BuildConfig.DEBUG) {
-                val override = when (selectedDebugArm) {
-                    DebugArmOption.RANDOM -> null
-                    DebugArmOption.IDENTITY -> StudyArm.IDENTITY
-                    DebugArmOption.MINDFULNESS -> StudyArm.MINDFULNESS
-                    DebugArmOption.FRICTION -> StudyArm.FRICTION
-                    DebugArmOption.BLANK -> StudyArm.BLANK
-                }
-                studyArmManager.assignArmIfNeeded(override)
-            } else {
-                studyArmManager.assignArmIfNeeded()
+            val device = withContext(Dispatchers.IO) { db.deviceDao().getDevice() }
+            val deviceId = device?.deviceId ?: return@launch
+            
+            val response = OnboardingResponseEntity(
+                deviceId = deviceId,
+                completedAt = System.currentTimeMillis(),
+                trait1 = trait1,
+                trait2 = trait2,
+                trait3 = trait3,
+                goal1 = goal1,
+                goal2 = goal2,
+                goal3 = goal3,
+                role1 = role1,
+                role2 = role2,
+                role3 = role3,
+                automaticity = automaticity,
+                utility = utility,
+                intention = intention
+            )
+            
+            withContext(Dispatchers.IO) {
+                db.onboardingResponseDao().insertOnboardingResponse(response)
             }
-            // Import baseline after device is registered (needs device_id for session rows).
-            sessionRepository.importBaselineFromUsageStats(getApplication())
-        }
-    }
-
-    /**
-     * Debug-only reset of the stored study arm/device row.
-     * Does not touch sessions or interventions.
-     */
-    fun resetStudyArm() {
-        if (!BuildConfig.DEBUG) return
-        viewModelScope.launch {
-            studyArmManager.resetStudyArm()
-            // Reset UI selection back to Random so next onboarding behaves like fresh assignment.
-            selectedDebugArm = DebugArmOption.RANDOM
+            
+            isSubmitting = false
+            onComplete()
         }
     }
 }
-
