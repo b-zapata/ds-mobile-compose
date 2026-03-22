@@ -5215,7 +5215,10 @@ CREATE TABLE IF NOT EXISTS onboarding_responses (
 
   automaticity INTEGER NULL,
   utility INTEGER NULL,
-  intention INTEGER NULL
+  intention INTEGER NULL,
+
+  readiness_reduce_use INTEGER NULL,
+  willingness_pause_task INTEGER NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_onboarding_responses_intention ON onboarding_responses(intention);
@@ -5250,12 +5253,16 @@ async function sendResponse(responseUrl, status, reason, data, event) {
     NoEcho: false,
     Data: data
   });
-  console.log(`[sendResponse] Starting CloudFormation callback to ${responseUrl}`);
+  console.log(
+    `[sendResponse] Starting CloudFormation callback to ${responseUrl}`
+  );
   console.log(`[sendResponse] Status: ${status}, Reason: ${reason}`);
   await new Promise((resolve, reject) => {
     const url = new URL(responseUrl);
     const timeoutHandle = setTimeout(() => {
-      console.error(`[sendResponse] TIMEOUT after 5s waiting for CloudFormation response`);
+      console.error(
+        `[sendResponse] TIMEOUT after 5s waiting for CloudFormation response`
+      );
       req.destroy();
       reject(new Error("CloudFormation callback timeout (5s)"));
     }, 5e3);
@@ -5270,10 +5277,16 @@ async function sendResponse(responseUrl, status, reason, data, event) {
         }
       },
       (res) => {
-        console.log(`[sendResponse] Got response from CloudFormation: status ${res.statusCode}`);
+        console.log(
+          `[sendResponse] Got response from CloudFormation: status ${res.statusCode}`
+        );
         clearTimeout(timeoutHandle);
         if ((res.statusCode ?? 500) >= 400) {
-          reject(new Error(`Failed to send CloudFormation response: ${res.statusCode}`));
+          reject(
+            new Error(
+              `Failed to send CloudFormation response: ${res.statusCode}`
+            )
+          );
           return;
         }
         res.on("data", () => void 0);
@@ -5304,12 +5317,20 @@ var handler = async (event) => {
   const responseUrl = event.ResponseURL;
   const isCloudFormationInvoke = Boolean(responseUrl);
   const requestType = event.RequestType ?? "Update";
-  console.log(`[handler] isCloudFormationInvoke=${isCloudFormationInvoke}, requestType=${requestType}`);
+  console.log(
+    `[handler] isCloudFormationInvoke=${isCloudFormationInvoke}, requestType=${requestType}`
+  );
   try {
     if (requestType === "Delete") {
       console.log(`[handler] Handling Delete request`);
       if (isCloudFormationInvoke && responseUrl) {
-        await sendResponse(responseUrl, "SUCCESS", "Delete: nothing to do", {}, event);
+        await sendResponse(
+          responseUrl,
+          "SUCCESS",
+          "Delete: nothing to do",
+          {},
+          event
+        );
       }
       return;
     }
@@ -5333,12 +5354,21 @@ var handler = async (event) => {
       console.log(`[handler] Schema applied successfully`);
       if (isCloudFormationInvoke && responseUrl) {
         console.log(`[handler] Sending CloudFormation SUCCESS response`);
-        await sendResponse(responseUrl, "SUCCESS", "Schema applied", { ok: true }, event);
+        await sendResponse(
+          responseUrl,
+          "SUCCESS",
+          "Schema applied",
+          { ok: true },
+          event
+        );
         return;
       }
       return { ok: true, mode: "direct" };
     } catch (e) {
-      console.error(`[handler] Error during schema setup: ${e?.message ?? String(e)}`, e?.stack);
+      console.error(
+        `[handler] Error during schema setup: ${e?.message ?? String(e)}`,
+        e?.stack
+      );
       try {
         await client.query("ROLLBACK");
         console.log(`[handler] Rolled back transaction`);

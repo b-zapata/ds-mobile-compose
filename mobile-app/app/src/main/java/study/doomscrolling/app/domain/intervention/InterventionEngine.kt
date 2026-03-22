@@ -157,7 +157,8 @@ class InterventionEngine(
             return
         }
 
-        val studyArm = studyArmManager.getRandomArm()
+        // DEBUG: Force FRICTION arm for all interventions
+        val studyArm = StudyArm.FRICTION
         val milestoneMinutes = checkpointMinutes ?: 0
 
         val personalization = if (studyArm == StudyArm.IDENTITY) {
@@ -201,7 +202,8 @@ class InterventionEngine(
         val prompt = Prompt(
             id = "arm_${studyArm.name.lowercase()}_${milestoneMinutes}_${promptInstance.promptVariant}",
             text = promptInstance.text,
-            category = "milestone_$milestoneMinutes"
+            category = "milestone_$milestoneMinutes",
+            arm = studyArm
         )
         promptManager.showPrompt(
             prompt = prompt,

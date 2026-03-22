@@ -260,13 +260,15 @@ async function insertOnboardingResponse(
       trait_1, trait_2, trait_3,
       goal_1, goal_2, goal_3,
       role_1, role_2, role_3,
-      automaticity, utility, intention
+      automaticity, utility, intention,
+      readiness_reduce_use, willingness_pause_task
     ) VALUES (
       $1, $2, to_timestamp($3 / 1000.0),
       $4, $5, $6,
       $7, $8, $9,
       $10, $11, $12,
-      $13, $14, $15
+      $13, $14, $15,
+      $16, $17
     )
     ON CONFLICT (device_id) DO UPDATE SET
       onboarding_version = EXCLUDED.onboarding_version,
@@ -282,7 +284,9 @@ async function insertOnboardingResponse(
       role_3 = EXCLUDED.role_3,
       automaticity = EXCLUDED.automaticity,
       utility = EXCLUDED.utility,
-      intention = EXCLUDED.intention
+      intention = EXCLUDED.intention,
+      readiness_reduce_use = EXCLUDED.readiness_reduce_use,
+      willingness_pause_task = EXCLUDED.willingness_pause_task
     `,
     [
       deviceId,
@@ -299,7 +303,9 @@ async function insertOnboardingResponse(
       r.role_3 ?? null,
       r.automaticity ?? null,
       r.utility ?? null,
-      r.intention ?? null
+      r.intention ?? null,
+      r.readiness_reduce_use ?? null,
+      r.willingness_pause_task ?? null
     ]
   );
 }

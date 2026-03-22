@@ -68,7 +68,10 @@ CREATE TABLE IF NOT EXISTS onboarding_responses (
 
   automaticity INTEGER NULL,
   utility INTEGER NULL,
-  intention INTEGER NULL
+  intention INTEGER NULL,
+
+  readiness_reduce_use INTEGER NULL,
+  willingness_pause_task INTEGER NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_onboarding_responses_intention ON onboarding_responses(intention);

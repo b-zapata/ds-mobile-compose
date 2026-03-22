@@ -12,3 +12,5 @@ Generic Onboarding Survey
 10. Automaticity: “How often do you open your most-used app without thinking about it?” (5-point Likert scale: Not often at all – Very often)
 11. Utility: “After spending time scrolling, how do you usually feel?” (5-point Likert scale: Much worse – Much better).
 12. Intention: “To what extent do you want to reduce the amount of time you spend scrolling?” (5-point Likert scale: Not at all – Very)
+13. “How ready are you to actively work on reducing your social media use over the next week?” Scale: 5-point Likert (Not at all → Very)
+14. “How willing would you be to pause or complete a short task before continuing to use an app? Scale: 5-point Likert (Not at all → Very)

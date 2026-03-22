@@ -28,6 +28,7 @@ import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import kotlinx.coroutines.flow.MutableStateFlow
 import study.doomscrolling.app.R
 import study.doomscrolling.app.domain.intervention.InterventionCompletionNotifier
+import study.doomscrolling.app.domain.study.StudyArm
 
 /**
  * Foreground service that displays the prompt overlay above other apps using WindowManager.
@@ -43,6 +44,7 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
     private var windowManager: WindowManager? = null
     private var currentInterventionId: String? = null
     private var currentSessionId: String? = null
+    private var currentStudyArm: StudyArm = StudyArm.CONTROL
     
     // Audio Focus management to mute other apps
     private var audioManager: AudioManager? = null
@@ -73,6 +75,8 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
         val promptText = intent?.getStringExtra(EXTRA_PROMPT_TEXT) ?: return super.onStartCommand(intent, flags, startId)
         currentInterventionId = intent.getStringExtra(EXTRA_INTERVENTION_ID)
         currentSessionId = intent.getStringExtra(EXTRA_SESSION_ID)
+        val armName = intent.getStringExtra(EXTRA_STUDY_ARM)
+        currentStudyArm = if (armName != null) StudyArm.valueOf(armName) else StudyArm.CONTROL
         
         val notification = buildNotification()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
@@ -143,6 +147,13 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
 
     private fun showOverlay(promptText: String) {
         val wm = windowManager ?: return
+        
+        // DYNAMIC FLAGS: Allow keyboard focus ONLY if the arm is FRICTION
+        var flags = WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
+        if (currentStudyArm != StudyArm.FRICTION) {
+            flags = flags or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+        }
+
         val layoutParams = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.MATCH_PARENT,
@@ -152,10 +163,12 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
                 @Suppress("DEPRECATION")
                 WindowManager.LayoutParams.TYPE_PHONE
             },
-            WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+            flags,
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.CENTER
+            // Ensures the keyboard shows up on top of the overlay
+            softInputMode = WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
         }
         
         val composeView = ComposeView(this).apply {
@@ -166,6 +179,7 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
                 PromptOverlayView(
                     promptText = promptText,
                     secondsLeft = secondsLeft,
+                    studyArm = currentStudyArm,
                     onContinue = {
                         handleCompletion(action = "continued_session")
                     },
@@ -226,5 +240,6 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
         const val EXTRA_PROMPT_CATEGORY = "prompt_category"
         const val EXTRA_INTERVENTION_ID = "intervention_id"
         const val EXTRA_SESSION_ID = "session_id"
+        const val EXTRA_STUDY_ARM = "study_arm"
     }
 }

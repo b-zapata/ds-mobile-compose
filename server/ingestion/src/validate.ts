@@ -29,11 +29,6 @@ function isNullableString(v: unknown): v is string | null {
   return v === null || isString(v);
 }
 
-function isNullableInt(v: unknown): number | null {
-  if (v === null) return true;
-  return typeof v === "number" && Number.isFinite(v);
-}
-
 function validateSession(v: unknown): ValidationOk<UploadSession> | ValidationErr {
   if (!isRecord(v)) return { ok: false, message: "sessions[] must contain objects" };
 
@@ -146,6 +141,10 @@ function validateOnboardingResponse(v: unknown): ValidationOk<UploadOnboardingRe
       automaticity: getNullableNumber("automaticity"),
       utility: getNullableNumber("utility"),
       intention: getNullableNumber("intention"),
+
+      // NEW FIELDS
+      readiness_reduce_use: getNullableNumber("readiness_reduce_use"),
+      willingness_pause_task: getNullableNumber("willingness_pause_task"),
     };
 
     return { ok: true, value: onboarding };
@@ -254,4 +253,3 @@ export function validatePayload(body: unknown): ValidationOk<UploadPayload> | Va
     }
   };
 }
-

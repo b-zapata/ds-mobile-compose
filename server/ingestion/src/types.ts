@@ -45,6 +45,9 @@ export type UploadOnboardingResponse = {
   automaticity: number | null;
   utility: number | null;
   intention: number | null;
+
+  readiness_reduce_use: number | null;
+  willingness_pause_task: number | null;
 };
 
 export type UploadExitSurveyResponse = {
