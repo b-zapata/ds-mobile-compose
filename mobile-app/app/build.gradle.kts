@@ -31,12 +31,12 @@ android {
     buildTypes {
         debug {
             // Study/dev endpoint can be swapped without code changes.
-            buildConfigField("String", "INGESTION_URL", "\"https://0jstclc8pi.execute-api.us-west-2.amazonaws.com/ingest\"")
+            buildConfigField("String", "INGESTION_URL", "\"https://6db9sn1m63.execute-api.us-west-2.amazonaws.com/ingest\"")
         }
         release {
             isMinifyEnabled = false
             // For production, set this to the production API Gateway URL.
-            buildConfigField("String", "INGESTION_URL", "\"https://0jstclc8pi.execute-api.us-west-2.amazonaws.com/ingest\"")
+            buildConfigField("String", "INGESTION_URL", "\"https://6db9sn1m63.execute-api.us-west-2.amazonaws.com/ingest\"")
         }
     }
     compileOptions {

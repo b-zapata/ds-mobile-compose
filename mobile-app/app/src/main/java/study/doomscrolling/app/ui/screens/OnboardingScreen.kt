@@ -23,7 +23,7 @@ fun OnboardingScreen(
     viewModel: OnboardingViewModel = viewModel()
 ) {
     var currentStep by rememberSaveable { mutableIntStateOf(0) }
-    val totalSteps = 12
+    val totalSteps = 14
     val progress = (currentStep + 1).toFloat() / totalSteps.toFloat()
 
     Scaffold(
@@ -49,11 +49,25 @@ fun OnboardingScreen(
                     } else {
                         Spacer(modifier = Modifier.size(48.dp))
                     }
-                    Text(
-                        text = "Question ${currentStep + 1} of $totalSteps",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    
+                    val isPart1 = currentStep < 9
+                    val partLabel = if (isPart1) "Part 1 of 2: About You" else "Part 2 of 2: Your Habits"
+                    val relativeStep = if (isPart1) currentStep + 1 else currentStep - 8
+                    val relativeTotal = if (isPart1) 9 else 5
+
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = partLabel,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Text(
+                            text = "Question $relativeStep of $relativeTotal",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    
                     Spacer(modifier = Modifier.size(48.dp))
                 }
             }
@@ -193,6 +207,20 @@ fun OnboardingScreen(
                             onValueChange = viewModel::onIntentionChange,
                             minLabel = "Not at all",
                             maxLabel = "Very much"
+                        )
+                        12 -> LikertStep(
+                            question = "How ready are you to actively work on reducing your social media use over the next week?",
+                            value = viewModel.readinessReduceUse,
+                            onValueChange = viewModel::onReadinessReduceUseChange,
+                            minLabel = "Not at all",
+                            maxLabel = "Very"
+                        )
+                        13 -> LikertStep(
+                            question = "How willing would you be to pause or complete a short task before continuing to use an app?",
+                            value = viewModel.willingnessPauseTask,
+                            onValueChange = viewModel::onWillingnessPauseTaskChange,
+                            minLabel = "Not at all",
+                            maxLabel = "Very"
                         )
                     }
                 }

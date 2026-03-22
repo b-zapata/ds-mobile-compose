@@ -37,53 +37,15 @@ class EligibilityViewModel(application: Application) : AndroidViewModel(applicat
     val uiState = _uiState.asStateFlow()
 
     /**
-     * Skip the server-side eligibility check for now while AWS is being debugged.
-     * Marks the device as enrolled immediately in the local database.
-     */
-    fun skipEligibilityAndEnrollLocally() {
-        if (_uiState.value.checking) return
-        viewModelScope.launch {
-            _uiState.value = EligibilityUiState(checking = true, eligible = null, message = "Enrolling locally (Bypassing server)…")
-            
-            val device = withContext(Dispatchers.IO) {
-                db.deviceDao().getDevice()
-            }
-            
-            if (device == null) {
-                _uiState.value = EligibilityUiState(
-                    checking = false,
-                    eligible = false,
-                    message = "Error: Device not found. Please sign the consent form first."
-                )
-                return@launch
-            }
-
-            // Mark as enrolled locally without calling the API
-            withContext(Dispatchers.IO) {
-                val updatedDevice = device.copy(enrolledAt = System.currentTimeMillis())
-                db.deviceDao().insertDevice(updatedDevice)
-            }
-
-            _uiState.value = EligibilityUiState(
-                checking = false,
-                eligible = true,
-                message = "Local enrollment successful! (Server check skipped for debugging)."
-            )
-        }
-    }
-
-    /**
      * Run baseline import for the last 7 days, evaluate eligibility (used any monitored app
      * on at least 5 of the last 7 days), and if eligible upload the baseline sessions to the server.
-     * 
-     * NOTE: This is the REAL implementation. It is currently on hold while debugging AWS.
      */
     fun checkEligibilityAndUploadBaseline() {
         if (_uiState.value.checking) return
         viewModelScope.launch {
-            _uiState.value = EligibilityUiState(checking = true, eligible = null, message = "Checking eligibility…")
+            _uiState.value = EligibilityUiState(checking = true, eligible = null, message = "Checking eligibility and usage history…")
 
-            // Populate baseline sessions table for last 7 days.
+            // 1. Populate baseline sessions table for last 7 days.
             withContext(Dispatchers.IO) {
                 sessionRepository.importBaselineFromUsageStats(getApplication())
             }
@@ -96,10 +58,10 @@ class EligibilityViewModel(application: Application) : AndroidViewModel(applicat
                 db.sessionDao().getSessions()
             }
             
-            // 1. All sessions in the last 7 days (for upload)
+            // 2. Filter sessions in the last 7 days
             val allRecent = allSessions.filter { it.startTimestamp >= since }
             
-            // 2. Just monitored sessions (for eligibility check)
+            // 3. Just monitored sessions (for eligibility check)
             val monitoredRecent = allRecent.filter { MonitoredApps.isMonitored(it.packageName) }
 
             if (monitoredRecent.isEmpty()) {
@@ -122,12 +84,12 @@ class EligibilityViewModel(application: Application) : AndroidViewModel(applicat
                 _uiState.value = EligibilityUiState(
                     checking = false,
                     eligible = false,
-                    message = "You are not eligible because you have not used any of the target apps on at least 5 of the last 7 days."
+                    message = "You are not eligible because you have not used any of the target apps on at least 5 of the last 7 days. (Found: $activeDays days)"
                 )
                 return@launch
             }
 
-            // If eligible, upload baseline sessions for last 7 days to the ingestion API.
+            // 4. If eligible, upload baseline sessions to the ingestion API.
             val device = withContext(Dispatchers.IO) {
                 db.deviceDao().getDevice()
             }
@@ -136,12 +98,11 @@ class EligibilityViewModel(application: Application) : AndroidViewModel(applicat
                 _uiState.value = EligibilityUiState(
                     checking = false,
                     eligible = true,
-                    message = "Eligibility passed, but device could not be found. Please restart the app and try again."
+                    message = "Eligibility passed, but device ID missing. Please sign the consent form first."
                 )
                 return@launch
             }
 
-            // IMPORTANT: Upload allRecent (everything), not just monitoredRecent
             val baselineSessions = allRecent.map { s ->
                 UploadSession(
                     sessionId = s.sessionId,
@@ -160,7 +121,7 @@ class EligibilityViewModel(application: Application) : AndroidViewModel(applicat
             )
 
             val json = UploadPayloadJson.toJsonString(payload)
-            val (code, _) = UploadService().postJson(BuildConfig.INGESTION_URL, json)
+            val (code, responseBody) = UploadService().postJson(BuildConfig.INGESTION_URL, json)
 
             if (code in 200..299) {
                 // MARK ELIGIBILITY AS PASSED by setting enrolledAt
@@ -172,13 +133,13 @@ class EligibilityViewModel(application: Application) : AndroidViewModel(applicat
                 _uiState.value = EligibilityUiState(
                     checking = false,
                     eligible = true,
-                    message = "You are eligible for the study. Baseline usage has been uploaded successfully."
+                    message = "Success! You are eligible and your baseline data has been uploaded. Redirecting..."
                 )
             } else {
                 _uiState.value = EligibilityUiState(
                     checking = false,
-                    eligible = true,
-                    message = "You are eligible for the study, but we could not upload your baseline usage. Please check your connection and try again."
+                    eligible = null,
+                    message = "Eligibility passed, but we couldn't connect to the server (Error $code). Please check your internet and try again."
                 )
             }
         }

@@ -13,6 +13,9 @@ data class OnboardingResponseEntity(
     @ColumnInfo(name = "completed_at")
     val completedAt: Long,
 
+    @ColumnInfo(name = "onboarding_version")
+    val onboardingVersion: String? = "1.0",
+
     // Identity Tokens (Arm A)
     @ColumnInfo(name = "trait_1") val trait1: String,
     @ColumnInfo(name = "trait_2") val trait2: String,
@@ -29,5 +32,8 @@ data class OnboardingResponseEntity(
     // Research Scales (General)
     @ColumnInfo(name = "automaticity") val automaticity: Int,
     @ColumnInfo(name = "utility") val utility: Int,
-    @ColumnInfo(name = "intention") val intention: Int
+    @ColumnInfo(name = "intention") val intention: Int,
+    
+    @ColumnInfo(name = "readiness_reduce_use") val readinessReduceUse: Int,
+    @ColumnInfo(name = "willingness_pause_task") val willingnessPauseTask: Int
 )

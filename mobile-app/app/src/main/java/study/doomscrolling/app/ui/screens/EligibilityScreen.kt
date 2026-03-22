@@ -29,25 +29,22 @@ fun EligibilityScreen(
             style = MaterialTheme.typography.headlineMedium
         )
         Spacer(modifier = Modifier.height(16.dp))
-        
         Text(
-            text = "DEBUG MODE: Server enrollment is currently on hold. Tap the button below to enroll locally and continue development.",
+            text = "We will now check if you are eligible for this study based on your phone usage over the last 7 days. This requires usage access permission.",
             style = MaterialTheme.typography.bodyMedium,
-            textAlign = TextAlign.Center,
-            color = MaterialTheme.colorScheme.primary
+            textAlign = TextAlign.Center
         )
-        
         Spacer(modifier = Modifier.height(32.dp))
 
         if (state.checking) {
             CircularProgressIndicator()
             Spacer(modifier = Modifier.height(16.dp))
-            Text("Enrolling locally...")
+            Text("Analyzing usage data and connecting to server...")
         } else {
             Button(
-                onClick = { viewModel.skipEligibilityAndEnrollLocally() }
+                onClick = { viewModel.checkEligibilityAndUploadBaseline() }
             ) {
-                Text("Enroll Locally (Skip Server)")
+                Text("Check Eligibility")
             }
         }
 
