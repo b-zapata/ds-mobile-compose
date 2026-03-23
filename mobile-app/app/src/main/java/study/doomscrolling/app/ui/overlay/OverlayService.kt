@@ -15,8 +15,6 @@ import android.os.Looper
 import android.util.Log
 import android.view.Gravity
 import android.view.WindowManager
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.ComposeView
 import androidx.core.app.NotificationCompat
 import androidx.lifecycle.LifecycleService
@@ -26,6 +24,8 @@ import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import kotlinx.coroutines.flow.MutableStateFlow
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import study.doomscrolling.app.R
 import study.doomscrolling.app.domain.intervention.InterventionCompletionNotifier
 import study.doomscrolling.app.domain.study.StudyArm
@@ -73,6 +73,16 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val promptText = intent?.getStringExtra(EXTRA_PROMPT_TEXT) ?: return super.onStartCommand(intent, flags, startId)
+        
+        // If an intervention was already active and not dismissed, notify completion as 'skipped'
+        // before starting the new one.
+        val oldInterventionId = currentInterventionId
+        val oldSessionId = currentSessionId
+        if (oldInterventionId != null && oldSessionId != null && overlayView != null) {
+            Log.i(TAG, "New intervention triggered before old one dismissed; skipping old one.")
+            InterventionCompletionNotifier.notifyCompleted(oldInterventionId, oldSessionId, "skipped_by_new")
+        }
+
         currentInterventionId = intent.getStringExtra(EXTRA_INTERVENTION_ID)
         currentSessionId = intent.getStringExtra(EXTRA_SESSION_ID)
         val armName = intent.getStringExtra(EXTRA_STUDY_ARM)
@@ -148,6 +158,9 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
     private fun showOverlay(promptText: String) {
         val wm = windowManager ?: return
         
+        // DYNAMIC BUG FIX: Remove any existing overlay before adding a new one
+        removeOverlay()
+
         // DYNAMIC FLAGS: Allow keyboard focus ONLY if the arm is FRICTION
         var flags = WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
         if (currentStudyArm != StudyArm.FRICTION) {
@@ -167,7 +180,6 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.CENTER
-            // Ensures the keyboard shows up on top of the overlay
             softInputMode = WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
         }
         
@@ -213,10 +225,10 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
     }
 
     private fun removeOverlay() {
-        handler.removeCallbacks(timerRunnable)
         overlayView?.let { view ->
             try {
                 windowManager?.removeView(view)
+                Log.d(TAG, "Overlay view removed from WindowManager")
             } catch (e: Exception) {
                 Log.w(TAG, "Error removing overlay", e)
             }
