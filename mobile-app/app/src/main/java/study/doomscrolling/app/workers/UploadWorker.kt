@@ -14,8 +14,6 @@ import study.doomscrolling.app.data.upload.UploadSession
 
 /**
  * Nightly WorkManager worker that uploads sessions + interventions.
- *
- * Phase 10: query Room, serialize to JSON, POST to HTTPS endpoint, log result.
  */
 class UploadWorker(
     context: Context,
@@ -52,6 +50,7 @@ class UploadWorker(
                     interventionId = i.interventionId,
                     sessionId = i.sessionId,
                     deviceId = i.deviceId,
+                    interventionArm = i.interventionArm, // FIX: Pass the arm from local DB
                     milestoneMinutes = i.milestoneMinutes,
                     promptVariant = i.promptVariant,
                     userAction = i.userAction,
@@ -69,7 +68,6 @@ class UploadWorker(
             Log.i(TAG, "UPLOAD_RESPONSE status=$code body=${body.take(2000)}")
             if (code in 200..299) {
                 Log.i(TAG, "UPLOAD_SUCCESS")
-                // Placeholder for Phase 11/12: mark rows as uploaded instead of deleting.
                 Result.success()
             } else {
                 Log.w(TAG, "UPLOAD_FAILED status=$code")

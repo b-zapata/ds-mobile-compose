@@ -1,6 +1,7 @@
 package study.doomscrolling.app.viewmodel
 
 import android.app.Application
+import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -9,8 +10,11 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import study.doomscrolling.app.BuildConfig
 import study.doomscrolling.app.data.database.AppDatabase
 import study.doomscrolling.app.data.entities.ExitSurveyResponseEntity
+import study.doomscrolling.app.data.upload.UploadPayloadJson
+import study.doomscrolling.app.data.upload.UploadService
 
 class ExitSurveyViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -56,8 +60,21 @@ class ExitSurveyViewModel(application: Application) : AndroidViewModel(applicati
                 suggestions = suggestions
             )
             
+            // 1. Save locally
             withContext(Dispatchers.IO) {
                 db.exitSurveyResponseDao().insertExitSurveyResponse(response)
+            }
+
+            // 2. Upload to server immediately
+            val json = UploadPayloadJson.exitSurveyToPayloadJsonString(response)
+            try {
+                val (code, responseBody) = withContext(Dispatchers.IO) {
+                    UploadService().postJson(BuildConfig.INGESTION_URL, json)
+                }
+                Log.i("ExitSurveyVM", "Upload successful: $code - $responseBody")
+            } catch (e: Exception) {
+                Log.e("ExitSurveyVM", "Upload failed", e)
+                // Proceed anyway as it's saved locally
             }
             
             isSubmitting = false

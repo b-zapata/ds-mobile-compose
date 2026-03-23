@@ -153,7 +153,8 @@ fun DashboardScreen(
                 title = "Fill out exit survey",
                 isCompleted = hasExited,
                 subtitle = if (studyCompleted && !hasExited) "Ready to complete" else null,
-                onClick = if (studyCompleted && !hasExited) onNavigateToExitSurvey else null
+                // DEBUG: Tappable even if study not completed, so you can test submission
+                onClick = onNavigateToExitSurvey
             )
 
             if (BuildConfig.DEBUG) {

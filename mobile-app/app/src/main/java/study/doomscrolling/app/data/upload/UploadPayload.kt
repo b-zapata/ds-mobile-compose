@@ -19,10 +19,10 @@ data class UploadIntervention(
     val interventionId: String,
     val sessionId: String,
     val deviceId: String,
+    val interventionArm: String, // Added ARM field
     val milestoneMinutes: Int,
     val promptVariant: Int,
     val userAction: String?,
     val interventionStartTs: Long,
     val interventionEndTs: Long?
 )
-

@@ -2,6 +2,7 @@ package study.doomscrolling.app.data.upload
 
 import org.json.JSONArray
 import org.json.JSONObject
+import study.doomscrolling.app.data.entities.ExitSurveyResponseEntity
 import study.doomscrolling.app.data.entities.OnboardingResponseEntity
 
 object UploadPayloadJson {
@@ -14,8 +15,8 @@ object UploadPayloadJson {
                         put("device_id", s.deviceId)
                         put("app_package_name", s.appPackageName)
                         put("session_start_ts", s.sessionStartTs)
-                        put("session_end_ts", s.sessionEndTs)
-                        put("duration_seconds", s.durationSeconds)
+                        put("session_end_ts", s.sessionEndTs ?: JSONObject.NULL)
+                        put("duration_seconds", s.durationSeconds ?: JSONObject.NULL)
                     }
                 )
             }
@@ -28,11 +29,12 @@ object UploadPayloadJson {
                         put("intervention_id", i.interventionId)
                         put("session_id", i.sessionId)
                         put("device_id", i.deviceId)
+                        put("intervention_arm", i.interventionArm) // FIX: Added arm to JSON
                         put("milestone_minutes", i.milestoneMinutes)
                         put("prompt_variant", i.promptVariant)
-                        put("user_action", i.userAction)
+                        put("user_action", i.userAction ?: JSONObject.NULL)
                         put("intervention_start_ts", i.interventionStartTs)
-                        put("intervention_end_ts", i.interventionEndTs)
+                        put("intervention_end_ts", i.interventionEndTs ?: JSONObject.NULL)
                     }
                 )
             }
@@ -47,11 +49,10 @@ object UploadPayloadJson {
 
     /**
      * Wraps an onboarding response into a full Study Payload expected by the server.
-     * Includes mandatory empty arrays for sessions and interventions to satisfy server validation.
      */
     fun onboardingToPayloadJsonString(response: OnboardingResponseEntity): String {
         val onboardingObj = JSONObject().apply {
-            put("onboarding_version", response.onboardingVersion)
+            put("onboarding_version", response.onboardingVersion ?: JSONObject.NULL)
             put("completed_at", response.completedAt)
             
             // Text fields
@@ -75,9 +76,39 @@ object UploadPayloadJson {
 
         return JSONObject().apply {
             put("device_id", response.deviceId)
-            put("sessions", JSONArray()) // Mandatory empty array
-            put("interventions", JSONArray()) // Mandatory empty array
+            put("sessions", JSONArray()) 
+            put("interventions", JSONArray()) 
             put("onboarding_response", onboardingObj)
+        }.toString()
+    }
+
+    /**
+     * Wraps an exit survey response into a full Study Payload expected by the server.
+     */
+    fun exitSurveyToPayloadJsonString(response: ExitSurveyResponseEntity): String {
+        val exitObj = JSONObject().apply {
+            put("completed_at", response.completedAt)
+            
+            // Likert Scales
+            put("interruption_awareness", response.interruptionAwareness)
+            put("decision_influence", response.decisionInfluence)
+            put("helpfulness", response.helpfulness)
+            put("frustration", response.frustration)
+            put("pause_reconsider", response.pauseReconsider)
+            put("easier_to_ignore", response.easierToIgnore)
+            put("outside_use_likelihood", response.outsideUseLikelihood)
+            
+            // Open responses
+            put("biggest_influence_aspect", response.biggestInfluenceAspect)
+            put("own_words_effect", response.ownWordsEffect)
+            put("suggestions", response.suggestions)
+        }
+
+        return JSONObject().apply {
+            put("device_id", response.deviceId)
+            put("sessions", JSONArray()) 
+            put("interventions", JSONArray())
+            put("exit_survey_response", exitObj)
         }.toString()
     }
 }
