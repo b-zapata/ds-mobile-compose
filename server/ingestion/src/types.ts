@@ -19,6 +19,7 @@ export type UploadIntervention = {
   intervention_id: string;
   session_id: string;
   device_id: string;
+  intervention_arm: string;
   milestone_minutes: number;
   prompt_variant: number;
   user_action: string | null;
@@ -65,4 +66,3 @@ export type UploadExitSurveyResponse = {
   own_words_effect: string | null;
   suggestions: string | null;
 };
-

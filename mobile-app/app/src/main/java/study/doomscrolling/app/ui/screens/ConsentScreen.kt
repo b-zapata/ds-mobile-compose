@@ -85,6 +85,7 @@ If you choose to participate in this study, you will be asked to:
 The research application monitors usage of certain social media apps, including:
 - YouTube
 - Instagram
+- Threads
 - Facebook
 - TikTok
 - X (formerly Twitter)

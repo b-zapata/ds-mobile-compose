@@ -4,7 +4,7 @@ import {
   UploadIntervention,
   UploadOnboardingResponse,
   UploadPayload,
-  UploadSession
+  UploadSession,
 } from "./types";
 
 type DbConfig = {
@@ -38,14 +38,17 @@ export function getDbConfigFromEnv(env: NodeJS.ProcessEnv): DbConfig | null {
   return { host, port, database, user, password, ssl };
 }
 
-export async function insertUploadPayload(payload: UploadPayload, config: DbConfig): Promise<void> {
+export async function insertUploadPayload(
+  payload: UploadPayload,
+  config: DbConfig,
+): Promise<void> {
   const client = new Client({
     host: config.host,
     port: config.port,
     database: config.database,
     user: config.user,
     password: config.password,
-    ssl: config.ssl ? { rejectUnauthorized: false } : undefined
+    ssl: config.ssl ? { rejectUnauthorized: false } : undefined,
   });
 
   await client.connect();
@@ -59,16 +62,24 @@ export async function insertUploadPayload(payload: UploadPayload, config: DbConf
       VALUES ($1)
       ON CONFLICT (device_id) DO NOTHING
       `,
-      [payload.device_id]
+      [payload.device_id],
     );
 
     // Optional survey responses, captured once per device.
     if (payload.onboarding_response) {
-      await insertOnboardingResponse(client, payload.device_id, payload.onboarding_response);
+      await insertOnboardingResponse(
+        client,
+        payload.device_id,
+        payload.onboarding_response,
+      );
     }
 
     if (payload.exit_survey_response) {
-      await insertExitSurveyResponse(client, payload.device_id, payload.exit_survey_response);
+      await insertExitSurveyResponse(
+        client,
+        payload.device_id,
+        payload.exit_survey_response,
+      );
     }
 
     if (payload.sessions.length > 0) {
@@ -98,16 +109,25 @@ export async function insertUploadPayload(payload: UploadPayload, config: DbConf
           VALUES ($1)
           ON CONFLICT (device_id) DO NOTHING
           `,
-          [payload.device_id]
+          [payload.device_id],
         );
         for (const s of payload.sessions) await insertSession(client, s);
-        for (const i of payload.interventions) await insertIntervention(client, i);
+        for (const i of payload.interventions)
+          await insertIntervention(client, i);
 
         if (payload.onboarding_response) {
-          await insertOnboardingResponse(client, payload.device_id, payload.onboarding_response);
+          await insertOnboardingResponse(
+            client,
+            payload.device_id,
+            payload.onboarding_response,
+          );
         }
         if (payload.exit_survey_response) {
-          await insertExitSurveyResponse(client, payload.device_id, payload.exit_survey_response);
+          await insertExitSurveyResponse(
+            client,
+            payload.device_id,
+            payload.exit_survey_response,
+          );
         }
 
         await client.query("COMMIT");
@@ -130,41 +150,53 @@ export async function getCounts(config: DbConfig): Promise<DbCounts> {
     database: config.database,
     user: config.user,
     password: config.password,
-    ssl: config.ssl ? { rejectUnauthorized: false } : undefined
+    ssl: config.ssl ? { rejectUnauthorized: false } : undefined,
   });
 
   await client.connect();
   try {
     await ensureSchema(client);
 
-    const devices = await client.query(`SELECT COUNT(*)::bigint AS c FROM devices`);
-    const sessions = await client.query(`SELECT COUNT(*)::bigint AS c FROM sessions`);
-    const interventions = await client.query(`SELECT COUNT(*)::bigint AS c FROM interventions`);
+    const devices = await client.query(
+      `SELECT COUNT(*)::bigint AS c FROM devices`,
+    );
+    const sessions = await client.query(
+      `SELECT COUNT(*)::bigint AS c FROM sessions`,
+    );
+    const interventions = await client.query(
+      `SELECT COUNT(*)::bigint AS c FROM interventions`,
+    );
     return {
       devices: Number(devices.rows[0]?.c ?? 0),
       sessions: Number(sessions.rows[0]?.c ?? 0),
-      interventions: Number(interventions.rows[0]?.c ?? 0)
+      interventions: Number(interventions.rows[0]?.c ?? 0),
     };
   } finally {
     await client.end();
   }
 }
 
-export async function exportSessionsCsv(config: DbConfig, sinceMs?: number): Promise<string> {
+export async function exportSessionsCsv(
+  config: DbConfig,
+  sinceMs?: number,
+): Promise<string> {
   const client = new Client({
     host: config.host,
     port: config.port,
     database: config.database,
     user: config.user,
     password: config.password,
-    ssl: config.ssl ? { rejectUnauthorized: false } : undefined
+    ssl: config.ssl ? { rejectUnauthorized: false } : undefined,
   });
 
   await client.connect();
   try {
     await ensureSchema(client);
     const params: any[] = [];
-    const where = sinceMs ? (params.push(sinceMs), `WHERE session_start_ts >= to_timestamp($1 / 1000.0)`) : "";
+    const where = sinceMs
+      ? (params.push(sinceMs),
+        `WHERE session_start_ts >= to_timestamp($1 / 1000.0)`)
+      : "";
     const res = await client.query(
       `
       SELECT
@@ -178,7 +210,7 @@ export async function exportSessionsCsv(config: DbConfig, sinceMs?: number): Pro
       ${where}
       ORDER BY session_start_ts DESC
       `,
-      params
+      params,
     );
 
     const header = [
@@ -187,7 +219,7 @@ export async function exportSessionsCsv(config: DbConfig, sinceMs?: number): Pro
       "app_package_name",
       "session_start_ts",
       "session_end_ts",
-      "duration_seconds"
+      "duration_seconds",
     ];
     return toCsv(header, res.rows);
   } finally {
@@ -195,14 +227,17 @@ export async function exportSessionsCsv(config: DbConfig, sinceMs?: number): Pro
   }
 }
 
-export async function exportInterventionsCsv(config: DbConfig, sinceMs?: number): Promise<string> {
+export async function exportInterventionsCsv(
+  config: DbConfig,
+  sinceMs?: number,
+): Promise<string> {
   const client = new Client({
     host: config.host,
     port: config.port,
     database: config.database,
     user: config.user,
     password: config.password,
-    ssl: config.ssl ? { rejectUnauthorized: false } : undefined
+    ssl: config.ssl ? { rejectUnauthorized: false } : undefined,
   });
 
   await client.connect();
@@ -210,7 +245,8 @@ export async function exportInterventionsCsv(config: DbConfig, sinceMs?: number)
     await ensureSchema(client);
     const params: any[] = [];
     const where = sinceMs
-      ? (params.push(sinceMs), `WHERE intervention_start_ts >= to_timestamp($1 / 1000.0)`)
+      ? (params.push(sinceMs),
+        `WHERE intervention_start_ts >= to_timestamp($1 / 1000.0)`)
       : "";
     const res = await client.query(
       `
@@ -218,6 +254,7 @@ export async function exportInterventionsCsv(config: DbConfig, sinceMs?: number)
         intervention_id,
         session_id,
         device_id,
+        intervention_arm,
         milestone_minutes,
         prompt_variant,
         user_action,
@@ -227,18 +264,19 @@ export async function exportInterventionsCsv(config: DbConfig, sinceMs?: number)
       ${where}
       ORDER BY intervention_start_ts DESC
       `,
-      params
+      params,
     );
 
     const header = [
       "intervention_id",
       "session_id",
       "device_id",
+      "intervention_arm",
       "milestone_minutes",
       "prompt_variant",
       "user_action",
       "intervention_start_ts",
-      "intervention_end_ts"
+      "intervention_end_ts",
     ];
     return toCsv(header, res.rows);
   } finally {
@@ -249,7 +287,7 @@ export async function exportInterventionsCsv(config: DbConfig, sinceMs?: number)
 async function insertOnboardingResponse(
   client: Client,
   deviceId: string,
-  r: UploadOnboardingResponse
+  r: UploadOnboardingResponse,
 ): Promise<void> {
   await client.query(
     `
@@ -305,15 +343,15 @@ async function insertOnboardingResponse(
       r.utility ?? null,
       r.intention ?? null,
       r.readiness_reduce_use ?? null,
-      r.willingness_pause_task ?? null
-    ]
+      r.willingness_pause_task ?? null,
+    ],
   );
 }
 
 async function insertExitSurveyResponse(
   client: Client,
   deviceId: string,
-  r: UploadExitSurveyResponse
+  r: UploadExitSurveyResponse,
 ): Promise<void> {
   await client.query(
     `
@@ -361,8 +399,8 @@ async function insertExitSurveyResponse(
       r.outside_use_likelihood ?? null,
       r.biggest_influence_aspect ?? null,
       r.own_words_effect ?? null,
-      r.suggestions ?? null
-    ]
+      r.suggestions ?? null,
+    ],
   );
 }
 
@@ -421,8 +459,13 @@ function toCsv(header: string[], rows: Array<Record<string, any>>): string {
 function csvEscape(v: any): string {
   if (v === null || v === undefined) return "";
   const s = String(v);
-  if (s.includes("\"") || s.includes(",") || s.includes("\n") || s.includes("\r")) {
-    return `"${s.replace(/\"/g, "\"\"")}"`;
+  if (
+    s.includes('"') ||
+    s.includes(",") ||
+    s.includes("\n") ||
+    s.includes("\r")
+  ) {
+    return `"${s.replace(/\"/g, '""')}"`;
   }
   return s;
 }
@@ -447,37 +490,41 @@ async function insertSession(client: Client, s: UploadSession): Promise<void> {
       s.app_package_name,
       s.session_start_ts,
       s.session_end_ts ?? null,
-      s.duration_seconds ?? null
-    ]
+      s.duration_seconds ?? null,
+    ],
   );
 }
 
-async function insertIntervention(client: Client, i: UploadIntervention): Promise<void> {
+async function insertIntervention(
+  client: Client,
+  i: UploadIntervention,
+): Promise<void> {
   await client.query(
     `
     INSERT INTO interventions (
       intervention_id,
       device_id,
       session_id,
+      intervention_arm,
       milestone_minutes,
       prompt_variant,
       user_action,
       intervention_start_ts,
       intervention_end_ts,
       created_at
-    ) VALUES ($1, $2, $3, $4, $5, $6, to_timestamp($7 / 1000.0), to_timestamp($8 / 1000.0), NOW())
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, to_timestamp($8 / 1000.0), to_timestamp($9 / 1000.0), NOW())
     ON CONFLICT (intervention_id) DO NOTHING
     `,
     [
       i.intervention_id,
       i.device_id,
       i.session_id,
+      i.intervention_arm,
       i.milestone_minutes,
       i.prompt_variant,
       i.user_action ?? null,
       i.intervention_start_ts,
-      i.intervention_end_ts ?? null
-    ]
+      i.intervention_end_ts ?? null,
+    ],
   );
 }
-

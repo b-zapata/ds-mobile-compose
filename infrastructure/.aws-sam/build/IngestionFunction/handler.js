@@ -5326,6 +5326,7 @@ async function exportInterventionsCsv(config, sinceMs) {
         intervention_id,
         session_id,
         device_id,
+        intervention_arm,
         milestone_minutes,
         prompt_variant,
         user_action,
@@ -5341,6 +5342,7 @@ async function exportInterventionsCsv(config, sinceMs) {
       "intervention_id",
       "session_id",
       "device_id",
+      "intervention_arm",
       "milestone_minutes",
       "prompt_variant",
       "user_action",
@@ -5551,19 +5553,21 @@ async function insertIntervention(client, i) {
       intervention_id,
       device_id,
       session_id,
+      intervention_arm,
       milestone_minutes,
       prompt_variant,
       user_action,
       intervention_start_ts,
       intervention_end_ts,
       created_at
-    ) VALUES ($1, $2, $3, $4, $5, $6, to_timestamp($7 / 1000.0), to_timestamp($8 / 1000.0), NOW())
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, to_timestamp($8 / 1000.0), to_timestamp($9 / 1000.0), NOW())
     ON CONFLICT (intervention_id) DO NOTHING
     `,
     [
       i.intervention_id,
       i.device_id,
       i.session_id,
+      i.intervention_arm,
       i.milestone_minutes,
       i.prompt_variant,
       i.user_action ?? null,
@@ -5624,6 +5628,7 @@ function validateIntervention(v) {
     "intervention_id",
     "session_id",
     "device_id",
+    "intervention_arm",
     "milestone_minutes",
     "prompt_variant",
     "user_action",
@@ -5636,6 +5641,7 @@ function validateIntervention(v) {
   if (!isString(v.intervention_id)) return { ok: false, message: "intervention.intervention_id must be string" };
   if (!isString(v.session_id)) return { ok: false, message: "intervention.session_id must be string" };
   if (!isString(v.device_id)) return { ok: false, message: "intervention.device_id must be string" };
+  if (!isString(v.intervention_arm)) return { ok: false, message: "intervention.intervention_arm must be string" };
   if (!isNumber(v.milestone_minutes)) return { ok: false, message: "intervention.milestone_minutes must be number" };
   if (!isNumber(v.prompt_variant)) return { ok: false, message: "intervention.prompt_variant must be number" };
   if (!isNullableString(v.user_action)) return { ok: false, message: "intervention.user_action must be string|null" };
@@ -5645,6 +5651,7 @@ function validateIntervention(v) {
     intervention_id: v.intervention_id,
     session_id: v.session_id,
     device_id: v.device_id,
+    intervention_arm: v.intervention_arm,
     milestone_minutes: v.milestone_minutes,
     prompt_variant: v.prompt_variant,
     user_action: v.user_action,

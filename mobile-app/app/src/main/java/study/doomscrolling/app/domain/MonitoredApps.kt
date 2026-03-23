@@ -7,6 +7,7 @@ package study.doomscrolling.app.domain
 object MonitoredApps {
     val packageNames: Set<String> = setOf(
         "com.instagram.android",
+        "com.instagram.barcelona",
         "com.zhiliaoapp.musically",
         "com.google.android.youtube",
         "com.reddit.frontpage",
@@ -20,6 +21,7 @@ object MonitoredApps {
     /** Display names for Logcat. */
     fun displayName(packageName: String): String = when (packageName) {
         "com.instagram.android" -> "Instagram"
+        "com.instagram.barcelona" -> "Threads"
         "com.zhiliaoapp.musically" -> "TikTok"
         "com.google.android.youtube" -> "YouTube"
         "com.reddit.frontpage" -> "Reddit"

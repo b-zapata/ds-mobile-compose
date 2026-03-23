@@ -33,8 +33,7 @@ class DoomscrollingApplication : Application() {
             .build()
 
         val now = ZonedDateTime.now()
-        // DEBUG: Changed from 3 AM to 8:35 PM (20:35) for testing
-        var nextRun = now.withHour(20).withMinute(35).withSecond(0).withNano(0)
+        var nextRun = now.withHour(3).withMinute(0).withSecond(0).withNano(0)
         if (!nextRun.isAfter(now)) {
             nextRun = nextRun.plusDays(1)
         }
