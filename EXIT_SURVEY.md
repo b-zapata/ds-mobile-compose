@@ -6,7 +6,7 @@ Exit Survey
 4. How frustrating or annoying did you find the interruptions? (5-point Likert scale)
 5. Did the interruptions help you pause and reconsider whether you wanted to keep using the app? (5-point Likert scale)
 6. Over the course of the week, did the interruptions become easier to ignore? (5-point Likert scale)
-7. If a tool like this were available on your phone outside of a research study, how likely would you be to use it? (5-point Likert scale)
+7. If a tool like this were available on your phone outside of a research study for free, how likely would you be to use it? (5-point Likert scale)
 8. What aspect of the interruptions had the biggest influence on your decision to continue or stop using the app? (Open response)
 9. In your own words, how did the interruptions affect your phone use, if at all? (Open response)
 10. Do you have any suggestions for improving the intervention prompts or tasks? (Open response)

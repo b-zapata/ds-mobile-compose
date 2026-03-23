@@ -91,7 +91,7 @@ fun ExitSurveyScreen(
         )
 
         SurveyLikertScale(
-            label = "7. If a tool like this were available on your phone outside of a research study, how likely would you be to use it?",
+            label = "7. If a tool like this were available on your phone outside of a research study for free, how likely would you be to use it?",
             value = viewModel.outsideUseLikelihood,
             onValueChange = { viewModel.outsideUseLikelihood = it },
             minLabel = "Not likely",
