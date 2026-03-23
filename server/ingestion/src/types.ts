@@ -1,5 +1,6 @@
 export type UploadPayload = {
   device_id: string;
+  enrolled_at?: number | null;
   sessions: UploadSession[];
   interventions: UploadIntervention[];
   onboarding_response?: UploadOnboardingResponse | null;

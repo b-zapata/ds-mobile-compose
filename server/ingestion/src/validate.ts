@@ -269,6 +269,15 @@ export function validatePayload(
     return { ok: false, message: "interventions must be an array" };
   }
 
+  let enrolled_at: number | null | undefined = undefined;
+  if ("enrolled_at" in body) {
+    const raw = (body as any).enrolled_at as unknown;
+    if (!isNullableNumber(raw)) {
+      return { ok: false, message: "enrolled_at must be number|null" };
+    }
+    enrolled_at = raw;
+  }
+
   const sessions: UploadSession[] = [];
   for (const s of body.sessions) {
     const res = validateSession(s);
@@ -313,6 +322,7 @@ export function validatePayload(
     ok: true,
     value: {
       device_id: body.device_id,
+      enrolled_at,
       sessions,
       interventions,
       onboarding_response,

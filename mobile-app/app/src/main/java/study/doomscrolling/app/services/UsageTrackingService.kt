@@ -5,6 +5,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.IBinder
@@ -24,7 +25,9 @@ import study.doomscrolling.app.domain.prompts.PromptRenderer
 import study.doomscrolling.app.domain.models.Session
 import study.doomscrolling.app.domain.models.createSession
 import study.doomscrolling.app.domain.study.StudyArmManager
+import study.doomscrolling.app.domain.study.StudyWindow
 import study.doomscrolling.app.ui.MainActivity
+import study.doomscrolling.app.workers.UploadWorker
 
 /**
  * Foreground service that detects when monitored social media apps enter
@@ -65,6 +68,9 @@ class UsageTrackingService : Service() {
     }
     private var currentSession: Session? = null
     private var mismatchCount: Int = 0
+    private var studyEndAtMs: Long? = null
+    @Volatile
+    private var isTrackingLoopRunning: Boolean = false
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -79,6 +85,16 @@ class UsageTrackingService : Service() {
             stopSelf()
             return START_NOT_STICKY
         }
+
+        val enrolledAt = runBlocking { db.deviceDao().getDevice()?.enrolledAt }
+        studyEndAtMs = StudyWindow.studyEndAt(enrolledAt)
+        Log.i(TAG, "Service start gate: enrolledAt=$enrolledAt endAt=$studyEndAtMs now=${System.currentTimeMillis()} studyCompleted=${StudyWindow.isStudyCompleted(enrolledAt)}")
+        if (StudyWindow.isStudyCompleted(enrolledAt)) {
+            Log.i(TAG, "Study completed; disabling usage tracking/interventions.")
+            stopSelf()
+            return START_NOT_STICKY
+        }
+
         val notification = buildNotification()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             startForeground(NOTIFICATION_ID, notification, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
@@ -116,49 +132,69 @@ class UsageTrackingService : Service() {
     }
 
     private fun startTrackingLoop() {
-        Thread {
-            while (true) {
-                try {
-                    if (!ForegroundAppDetector.hasUsageStatsPermission(this)) break
-                    val foreground = detector.getCurrentForegroundPackage()
-                    val session = currentSession
-                    
-                    // Logic for BUG #1 and #2: If a heads-up is pending, we are MORE STUBBORN about 
-                    // keeping the session alive even if the foreground app briefly changes.
-                    val currentThreshold = if (interventionEngine.isHeadsUpPending()) {
-                        MISMATCH_THRESHOLD_STUBBORN
-                    } else {
-                        MISMATCH_THRESHOLD
-                    }
+        if (isTrackingLoopRunning) {
+            Log.i(TAG, "Tracking loop already running; refresh completed")
+            return
+        }
 
-                    when {
-                        foreground == null -> { /* ignore transient detection */ }
-                        foreground == session?.packageName -> {
-                            mismatchCount = 0
-                            if (MonitoredApps.isMonitored(foreground) && (session == null || session.packageName != foreground)) {
+        isTrackingLoopRunning = true
+        Thread {
+            try {
+                while (true) {
+                    try {
+                        if (!ForegroundAppDetector.hasUsageStatsPermission(this)) break
+
+                        val endAt = studyEndAtMs
+                        if (endAt != null && System.currentTimeMillis() >= endAt) {
+                            Log.i(TAG, "Study completed during tracking; stopping service and interventions.")
+                            endSession()
+                            UploadWorker.enqueueFinalUpload(applicationContext)
+                            stopSelf()
+                            break
+                        }
+
+                        val foreground = detector.getCurrentForegroundPackage()
+                        val session = currentSession
+                        
+                        // Logic for BUG #1 and #2: If a heads-up is pending, we are MORE STUBBORN about 
+                        // keeping the session alive even if the foreground app briefly changes.
+                        val currentThreshold = if (interventionEngine.isHeadsUpPending()) {
+                            MISMATCH_THRESHOLD_STUBBORN
+                        } else {
+                            MISMATCH_THRESHOLD
+                        }
+
+                        when {
+                            foreground == null -> { /* ignore transient detection */ }
+                            foreground == session?.packageName -> {
+                                mismatchCount = 0
+                                if (MonitoredApps.isMonitored(foreground) && (session == null || session.packageName != foreground)) {
+                                    endSession()
+                                    startSession(foreground)
+                                }
+                            }
+                            foreground in SYSTEM_PACKAGES -> { /* ignore system overlays */ }
+                            MonitoredApps.isMonitored(foreground) -> {
                                 endSession()
                                 startSession(foreground)
-                            }
-                        }
-                        foreground in SYSTEM_PACKAGES -> { /* ignore system overlays */ }
-                        MonitoredApps.isMonitored(foreground) -> {
-                            endSession()
-                            startSession(foreground)
-                            mismatchCount = 0
-                        }
-                        else -> {
-                            mismatchCount++
-                            if (mismatchCount >= currentThreshold) {
-                                Log.i(TAG, "Ending session due to package mismatch: $foreground")
-                                endSession()
                                 mismatchCount = 0
                             }
+                            else -> {
+                                mismatchCount++
+                                if (mismatchCount >= currentThreshold) {
+                                    Log.i(TAG, "Ending session due to package mismatch: $foreground")
+                                    endSession()
+                                    mismatchCount = 0
+                                }
+                            }
                         }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Tracking loop error", e)
                     }
-                } catch (e: Exception) {
-                    Log.e(TAG, "Tracking loop error", e)
+                    Thread.sleep(POLL_INTERVAL_MS)
                 }
-                Thread.sleep(POLL_INTERVAL_MS)
+            } finally {
+                isTrackingLoopRunning = false
             }
         }.start()
     }
@@ -198,5 +234,16 @@ class UsageTrackingService : Service() {
         )
 
         const val ACTION_START = "study.doomscrolling.app.START_USAGE_TRACKING"
+
+        fun startOrRefresh(context: Context) {
+            val intent = Intent(context, UsageTrackingService::class.java).apply {
+                action = ACTION_START
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                context.startForegroundService(intent)
+            } else {
+                context.startService(intent)
+            }
+        }
     }
 }

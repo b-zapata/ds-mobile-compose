@@ -24,6 +24,7 @@ import study.doomscrolling.app.BuildConfig
 import study.doomscrolling.app.data.database.AppDatabase
 import study.doomscrolling.app.data.entities.ExitSurveyResponseEntity
 import study.doomscrolling.app.data.entities.OnboardingResponseEntity
+import study.doomscrolling.app.domain.study.StudyWindow
 import study.doomscrolling.app.services.ForegroundAppDetector
 import study.doomscrolling.app.workers.UploadWorker
 
@@ -77,6 +78,12 @@ fun DashboardScreen(
     var timeRemainingText by remember { mutableStateOf<String?>(null) }
     var studyCompleted by remember { mutableStateOf(false) }
 
+    LaunchedEffect(studyCompleted) {
+        if (studyCompleted) {
+            UploadWorker.enqueueFinalUpload(context)
+        }
+    }
+
     // Refresh states from System and handle countdown
     LaunchedEffect(device) {
         hasPermissions = ForegroundAppDetector.hasUsageStatsPermission(context) &&
@@ -84,16 +91,15 @@ fun DashboardScreen(
         
         val enrolledAt = device?.enrolledAt
         if (enrolledAt != null) {
-            val weekMillis = 7L * 24 * 60 * 60 * 1000
             val now = System.currentTimeMillis()
-            val endAt = enrolledAt + weekMillis
+            val endAt = StudyWindow.studyEndAt(enrolledAt) ?: enrolledAt
             studyCompleted = now >= endAt
             
             if (!studyCompleted) {
                 val diff = endAt - now
-                val days = diff / (24 * 60 * 60 * 1000)
                 val hours = (diff / (60 * 60 * 1000)) % 24
-                timeRemainingText = "$days days, $hours hours remaining"
+                val minutes = (diff / (60 * 1000)) % 60
+                timeRemainingText = "$hours hours, $minutes minutes remaining"
             }
         }
     }
@@ -117,68 +123,75 @@ fun DashboardScreen(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text(
-                text = "Welcome to the study. Please complete the tasks below to help us with our research.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            if (hasExited) {
+                Text(
+                    text = "Thank you for your help with this study. We are now done collecting data. All app functionalities  have been disabled. Feel free to uninstall the app.",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.Medium
+                )
+            } else {
+                Text(
+                    text = "Welcome to the study. Please complete the tasks below to help us with our research.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
 
-            ChecklistItem(
-                title = "Sign consent form",
-                isCompleted = hasConsented,
-                onClick = if (!hasConsented) onNavigateToConsent else null
-            )
-            ChecklistItem(
-                title = "Grant phone permissions",
-                isCompleted = hasPermissions,
-                // DEBUG: Always clickable for testing, even if completed
-                onClick = onNavigateToPermissions
-            )
-            ChecklistItem(
-                title = "Check eligibility",
-                isCompleted = isEligible,
-                onClick = if (hasPermissions && !isEligible) onNavigateToEligibility else null
-            )
-            ChecklistItem(
-                title = "Fill out onboarding survey",
-                isCompleted = hasOnboarded,
-                onClick = if (isEligible && !hasOnboarded) onNavigateToOnboarding else null
-            )
-            ChecklistItem(
-                title = "Use your phone normally for a week",
-                isCompleted = studyCompleted,
-                subtitle = if (isEligible && !studyCompleted) timeRemainingText ?: "Study in progress" else null
-            )
-            ChecklistItem(
-                title = "Fill out exit survey",
-                isCompleted = hasExited,
-                subtitle = if (studyCompleted && !hasExited) "Ready to complete" else null,
-                // DEBUG: Tappable even if study not completed, so you can test submission
-                onClick = onNavigateToExitSurvey
-            )
+                ChecklistItem(
+                    title = "Sign consent form",
+                    isCompleted = hasConsented,
+                    onClick = if (!hasConsented) onNavigateToConsent else null
+                )
+                ChecklistItem(
+                    title = "Grant phone permissions",
+                    isCompleted = hasPermissions,
+                    onClick = if (hasConsented && !hasPermissions) onNavigateToPermissions else null
+                )
+                ChecklistItem(
+                    title = "Check eligibility",
+                    isCompleted = isEligible,
+                    onClick = if (hasPermissions && !isEligible) onNavigateToEligibility else null
+                )
+                ChecklistItem(
+                    title = "Fill out onboarding survey",
+                    isCompleted = hasOnboarded,
+                    onClick = if (isEligible && !hasOnboarded) onNavigateToOnboarding else null
+                )
+                ChecklistItem(
+                    title = "Use your phone normally for a week",
+                    isCompleted = studyCompleted,
+                    subtitle = if (isEligible && !studyCompleted) timeRemainingText ?: "Study in progress" else null
+                )
+                ChecklistItem(
+                    title = "Fill out exit survey",
+                    isCompleted = hasExited,
+                    subtitle = if (studyCompleted && !hasExited) "Ready to complete" else null,
+                    onClick = if (studyCompleted && !hasExited) onNavigateToExitSurvey else null
+                )
 
-            if (BuildConfig.DEBUG) {
-                Divider()
-                Text("Debug Actions", style = MaterialTheme.typography.labelLarge)
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Button(onClick = onOpenBaselineStats, modifier = Modifier.weight(1f)) {
-                        Text("Stats")
-                    }
-                    Button(onClick = onOpenPromptTest, modifier = Modifier.weight(1f)) {
-                        Text("Prompts")
-                    }
-                    Button(
-                        onClick = {
-                            val workManager = WorkManager.getInstance(context)
-                            val request = OneTimeWorkRequestBuilder<UploadWorker>().build()
-                            workManager.enqueue(request)
-                        },
-                        modifier = Modifier.weight(1f)
+                if (BuildConfig.DEBUG) {
+                    Divider()
+                    Text("Debug Actions", style = MaterialTheme.typography.labelLarge)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Text("Upload")
+                        Button(onClick = onOpenBaselineStats, modifier = Modifier.weight(1f)) {
+                            Text("Stats")
+                        }
+                        Button(onClick = onOpenPromptTest, modifier = Modifier.weight(1f)) {
+                            Text("Prompts")
+                        }
+                        Button(
+                            onClick = {
+                                val workManager = WorkManager.getInstance(context)
+                                val request = OneTimeWorkRequestBuilder<UploadWorker>().build()
+                                workManager.enqueue(request)
+                            },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Upload")
+                        }
                     }
                 }
             }

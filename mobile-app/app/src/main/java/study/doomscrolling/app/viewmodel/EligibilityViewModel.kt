@@ -17,6 +17,7 @@ import study.doomscrolling.app.data.upload.UploadService
 import study.doomscrolling.app.data.upload.UploadSession
 import study.doomscrolling.app.data.repository.SessionRepository
 import study.doomscrolling.app.domain.MonitoredApps
+import study.doomscrolling.app.services.UsageTrackingService
 import java.time.Instant
 import java.time.ZoneId
 
@@ -116,6 +117,7 @@ class EligibilityViewModel(application: Application) : AndroidViewModel(applicat
 
             val payload = UploadPayload(
                 deviceId = deviceId,
+                enrolledAt = device.enrolledAt ?: System.currentTimeMillis(),
                 sessions = baselineSessions,
                 interventions = emptyList<UploadIntervention>()
             )
@@ -129,6 +131,7 @@ class EligibilityViewModel(application: Application) : AndroidViewModel(applicat
                     val updatedDevice = device.copy(enrolledAt = System.currentTimeMillis())
                     db.deviceDao().insertDevice(updatedDevice)
                 }
+                UsageTrackingService.startOrRefresh(getApplication())
 
                 _uiState.value = EligibilityUiState(
                     checking = false,

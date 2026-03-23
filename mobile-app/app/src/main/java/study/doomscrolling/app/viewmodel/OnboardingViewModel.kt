@@ -15,6 +15,7 @@ import study.doomscrolling.app.data.database.AppDatabase
 import study.doomscrolling.app.data.entities.OnboardingResponseEntity
 import study.doomscrolling.app.data.upload.UploadPayloadJson
 import study.doomscrolling.app.data.upload.UploadService
+import study.doomscrolling.app.services.UsageTrackingService
 
 class OnboardingViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -89,6 +90,7 @@ class OnboardingViewModel(application: Application) : AndroidViewModel(applicati
             withContext(Dispatchers.IO) {
                 db.onboardingResponseDao().insertOnboardingResponse(response)
             }
+            UsageTrackingService.startOrRefresh(getApplication())
 
             // 2. Upload to server immediately
             val json = UploadPayloadJson.onboardingToPayloadJsonString(response)

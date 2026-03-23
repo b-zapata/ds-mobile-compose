@@ -30,6 +30,8 @@ Target = "es2020"
 
 
 
+
+
 [function_build_definitions.ebae5de8-9c17-46f4-847e-95d19bb94e26]
 codeuri = "C:\\Users\\bzapa\\OneDrive\\Documents\\GitHub\\ds-mobile-compose\\server\\ingestion"
 runtime = "nodejs20.x"
@@ -47,6 +49,8 @@ EntryPoints = ["src/schemaSetup.ts"]
 Minify = false
 Sourcemap = true
 Target = "es2020"
+
+
 
 
 

@@ -42,6 +42,13 @@ export async function insertUploadPayload(
   payload: UploadPayload,
   config: DbConfig,
 ): Promise<void> {
+  const resolvedEnrolledAt =
+    payload.enrolled_at ??
+    payload.onboarding_response?.completed_at ??
+    (payload.sessions.length > 0
+      ? Math.min(...payload.sessions.map((s) => s.session_start_ts))
+      : null);
+
   const client = new Client({
     host: config.host,
     port: config.port,
@@ -55,14 +62,15 @@ export async function insertUploadPayload(
   try {
     await client.query("BEGIN");
 
-    // devices: upsert by device_id. (Other columns may be null until Phase 12 expands.)
+    // devices: upsert by device_id and retain enrolled_at once known.
     await client.query(
       `
-      INSERT INTO devices (device_id)
-      VALUES ($1)
-      ON CONFLICT (device_id) DO NOTHING
+      INSERT INTO devices (device_id, enrolled_at)
+      VALUES ($1, to_timestamp($2 / 1000.0))
+      ON CONFLICT (device_id) DO UPDATE SET
+        enrolled_at = COALESCE(devices.enrolled_at, EXCLUDED.enrolled_at)
       `,
-      [payload.device_id],
+      [payload.device_id, resolvedEnrolledAt],
     );
 
     // Optional survey responses, captured once per device.
@@ -105,11 +113,12 @@ export async function insertUploadPayload(
       try {
         await client.query(
           `
-          INSERT INTO devices (device_id)
-          VALUES ($1)
-          ON CONFLICT (device_id) DO NOTHING
+          INSERT INTO devices (device_id, enrolled_at)
+          VALUES ($1, to_timestamp($2 / 1000.0))
+          ON CONFLICT (device_id) DO UPDATE SET
+            enrolled_at = COALESCE(devices.enrolled_at, EXCLUDED.enrolled_at)
           `,
-          [payload.device_id],
+          [payload.device_id, resolvedEnrolledAt],
         );
         for (const s of payload.sessions) await insertSession(client, s);
         for (const i of payload.interventions)

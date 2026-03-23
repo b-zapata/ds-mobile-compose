@@ -1,4 +1,10 @@
-import { exportInterventionsCsv, exportSessionsCsv, getCounts, getDbConfigFromEnv, insertUploadPayload } from "./db";
+import {
+  exportInterventionsCsv,
+  exportSessionsCsv,
+  getCounts,
+  getDbConfigFromEnv,
+  insertUploadPayload,
+} from "./db";
 import { validatePayload } from "./validate";
 
 type ApiResult = {
@@ -11,19 +17,23 @@ function json(statusCode: number, body: unknown): ApiResult {
   return {
     statusCode,
     headers: {
-      "content-type": "application/json"
+      "content-type": "application/json",
     },
-    body: JSON.stringify(body)
+    body: JSON.stringify(body),
   };
 }
 
-function text(statusCode: number, body: string, contentType: string): ApiResult {
+function text(
+  statusCode: number,
+  body: string,
+  contentType: string,
+): ApiResult {
   return {
     statusCode,
     headers: {
-      "content-type": contentType
+      "content-type": contentType,
     },
-    body
+    body,
   };
 }
 
@@ -42,7 +52,8 @@ function requireAdmin(event: any): ApiResult | null {
 }
 
 export const handler = async (event: any): Promise<ApiResult> => {
-  const method = event?.requestContext?.http?.method ?? event?.httpMethod ?? "POST";
+  const method =
+    event?.requestContext?.http?.method ?? event?.httpMethod ?? "POST";
   const path = event?.rawPath ?? event?.path ?? "";
 
   if (path.startsWith("/admin")) {
@@ -59,13 +70,19 @@ export const handler = async (event: any): Promise<ApiResult> => {
       if (method === "GET" && path === "/admin/sessions.csv") {
         const since = event?.queryStringParameters?.since_ms;
         const sinceMs = since ? Number(since) : undefined;
-        const csv = await exportSessionsCsv(dbConfig, Number.isFinite(sinceMs as any) ? sinceMs : undefined);
+        const csv = await exportSessionsCsv(
+          dbConfig,
+          Number.isFinite(sinceMs as any) ? sinceMs : undefined,
+        );
         return text(200, csv, "text/csv; charset=utf-8");
       }
       if (method === "GET" && path === "/admin/interventions.csv") {
         const since = event?.queryStringParameters?.since_ms;
         const sinceMs = since ? Number(since) : undefined;
-        const csv = await exportInterventionsCsv(dbConfig, Number.isFinite(sinceMs as any) ? sinceMs : undefined);
+        const csv = await exportInterventionsCsv(
+          dbConfig,
+          Number.isFinite(sinceMs as any) ? sinceMs : undefined,
+        );
         return text(200, csv, "text/csv; charset=utf-8");
       }
       return json(404, { ok: false, error: "Not found" });
@@ -94,8 +111,9 @@ export const handler = async (event: any): Promise<ApiResult> => {
   const payload = validated.value;
   console.log("INGESTION_REQUEST", {
     device_id: payload.device_id,
+    enrolled_at: payload.enrolled_at ?? null,
     sessions: payload.sessions.length,
-    interventions: payload.interventions.length
+    interventions: payload.interventions.length,
   });
 
   const dbConfig = getDbConfigFromEnv(process.env);
@@ -112,4 +130,3 @@ export const handler = async (event: any): Promise<ApiResult> => {
     return json(500, { ok: false, error: "DB insert failed" });
   }
 };
-

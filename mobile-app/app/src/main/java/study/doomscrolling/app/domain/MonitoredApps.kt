@@ -10,6 +10,7 @@ object MonitoredApps {
         "com.instagram.barcelona",
         "com.zhiliaoapp.musically",
         "com.google.android.youtube",
+        "com.spotify.music",
         "com.reddit.frontpage",
         "com.facebook.katana",
         "com.twitter.android"
@@ -24,6 +25,7 @@ object MonitoredApps {
         "com.instagram.barcelona" -> "Threads"
         "com.zhiliaoapp.musically" -> "TikTok"
         "com.google.android.youtube" -> "YouTube"
+        "com.spotify.music" -> "Spotify"
         "com.reddit.frontpage" -> "Reddit"
         "com.facebook.katana" -> "Facebook"
         "com.twitter.android" -> "Twitter"

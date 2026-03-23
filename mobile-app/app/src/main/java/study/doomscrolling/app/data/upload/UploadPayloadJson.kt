@@ -42,6 +42,7 @@ object UploadPayloadJson {
 
         return JSONObject().apply {
             put("device_id", payload.deviceId)
+            put("enrolled_at", payload.enrolledAt ?: JSONObject.NULL)
             put("sessions", sessionsArray)
             put("interventions", interventionsArray)
         }.toString()

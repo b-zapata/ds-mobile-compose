@@ -5170,6 +5170,7 @@ function getDbConfigFromEnv(env) {
   return { host, port, database, user, password, ssl };
 }
 async function insertUploadPayload(payload, config) {
+  const resolvedEnrolledAt = payload.enrolled_at ?? payload.onboarding_response?.completed_at ?? (payload.sessions.length > 0 ? Math.min(...payload.sessions.map((s) => s.session_start_ts)) : null);
   const client = new Client({
     host: config.host,
     port: config.port,
@@ -5183,17 +5184,26 @@ async function insertUploadPayload(payload, config) {
     await client.query("BEGIN");
     await client.query(
       `
-      INSERT INTO devices (device_id)
-      VALUES ($1)
-      ON CONFLICT (device_id) DO NOTHING
+      INSERT INTO devices (device_id, enrolled_at)
+      VALUES ($1, to_timestamp($2 / 1000.0))
+      ON CONFLICT (device_id) DO UPDATE SET
+        enrolled_at = COALESCE(devices.enrolled_at, EXCLUDED.enrolled_at)
       `,
-      [payload.device_id]
+      [payload.device_id, resolvedEnrolledAt]
     );
     if (payload.onboarding_response) {
-      await insertOnboardingResponse(client, payload.device_id, payload.onboarding_response);
+      await insertOnboardingResponse(
+        client,
+        payload.device_id,
+        payload.onboarding_response
+      );
     }
     if (payload.exit_survey_response) {
-      await insertExitSurveyResponse(client, payload.device_id, payload.exit_survey_response);
+      await insertExitSurveyResponse(
+        client,
+        payload.device_id,
+        payload.exit_survey_response
+      );
     }
     if (payload.sessions.length > 0) {
       for (const s of payload.sessions) {
@@ -5214,19 +5224,29 @@ async function insertUploadPayload(payload, config) {
       try {
         await client.query(
           `
-          INSERT INTO devices (device_id)
-          VALUES ($1)
-          ON CONFLICT (device_id) DO NOTHING
+          INSERT INTO devices (device_id, enrolled_at)
+          VALUES ($1, to_timestamp($2 / 1000.0))
+          ON CONFLICT (device_id) DO UPDATE SET
+            enrolled_at = COALESCE(devices.enrolled_at, EXCLUDED.enrolled_at)
           `,
-          [payload.device_id]
+          [payload.device_id, resolvedEnrolledAt]
         );
         for (const s of payload.sessions) await insertSession(client, s);
-        for (const i of payload.interventions) await insertIntervention(client, i);
+        for (const i of payload.interventions)
+          await insertIntervention(client, i);
         if (payload.onboarding_response) {
-          await insertOnboardingResponse(client, payload.device_id, payload.onboarding_response);
+          await insertOnboardingResponse(
+            client,
+            payload.device_id,
+            payload.onboarding_response
+          );
         }
         if (payload.exit_survey_response) {
-          await insertExitSurveyResponse(client, payload.device_id, payload.exit_survey_response);
+          await insertExitSurveyResponse(
+            client,
+            payload.device_id,
+            payload.exit_survey_response
+          );
         }
         await client.query("COMMIT");
         return;
@@ -5252,9 +5272,15 @@ async function getCounts(config) {
   await client.connect();
   try {
     await ensureSchema(client);
-    const devices = await client.query(`SELECT COUNT(*)::bigint AS c FROM devices`);
-    const sessions = await client.query(`SELECT COUNT(*)::bigint AS c FROM sessions`);
-    const interventions = await client.query(`SELECT COUNT(*)::bigint AS c FROM interventions`);
+    const devices = await client.query(
+      `SELECT COUNT(*)::bigint AS c FROM devices`
+    );
+    const sessions = await client.query(
+      `SELECT COUNT(*)::bigint AS c FROM sessions`
+    );
+    const interventions = await client.query(
+      `SELECT COUNT(*)::bigint AS c FROM interventions`
+    );
     return {
       devices: Number(devices.rows[0]?.c ?? 0),
       sessions: Number(sessions.rows[0]?.c ?? 0),
@@ -5594,7 +5620,8 @@ function isNullableString(v) {
   return v === null || isString(v);
 }
 function validateSession(v) {
-  if (!isRecord(v)) return { ok: false, message: "sessions[] must contain objects" };
+  if (!isRecord(v))
+    return { ok: false, message: "sessions[] must contain objects" };
   const required = [
     "session_id",
     "device_id",
@@ -5604,14 +5631,24 @@ function validateSession(v) {
     "duration_seconds"
   ];
   for (const key of required) {
-    if (!(key in v)) return { ok: false, message: `session missing field: ${key}` };
+    if (!(key in v))
+      return { ok: false, message: `session missing field: ${key}` };
   }
-  if (!isString(v.session_id)) return { ok: false, message: "session.session_id must be string" };
-  if (!isString(v.device_id)) return { ok: false, message: "session.device_id must be string" };
-  if (!isString(v.app_package_name)) return { ok: false, message: "session.app_package_name must be string" };
-  if (!isNumber(v.session_start_ts)) return { ok: false, message: "session.session_start_ts must be number" };
-  if (!isNullableNumber(v.session_end_ts)) return { ok: false, message: "session.session_end_ts must be number|null" };
-  if (!isNullableNumber(v.duration_seconds)) return { ok: false, message: "session.duration_seconds must be number|null" };
+  if (!isString(v.session_id))
+    return { ok: false, message: "session.session_id must be string" };
+  if (!isString(v.device_id))
+    return { ok: false, message: "session.device_id must be string" };
+  if (!isString(v.app_package_name))
+    return { ok: false, message: "session.app_package_name must be string" };
+  if (!isNumber(v.session_start_ts))
+    return { ok: false, message: "session.session_start_ts must be number" };
+  if (!isNullableNumber(v.session_end_ts))
+    return { ok: false, message: "session.session_end_ts must be number|null" };
+  if (!isNullableNumber(v.duration_seconds))
+    return {
+      ok: false,
+      message: "session.duration_seconds must be number|null"
+    };
   const session = {
     session_id: v.session_id,
     device_id: v.device_id,
@@ -5623,7 +5660,8 @@ function validateSession(v) {
   return { ok: true, value: session };
 }
 function validateIntervention(v) {
-  if (!isRecord(v)) return { ok: false, message: "interventions[] must contain objects" };
+  if (!isRecord(v))
+    return { ok: false, message: "interventions[] must contain objects" };
   const required = [
     "intervention_id",
     "session_id",
@@ -5636,17 +5674,45 @@ function validateIntervention(v) {
     "intervention_end_ts"
   ];
   for (const key of required) {
-    if (!(key in v)) return { ok: false, message: `intervention missing field: ${key}` };
+    if (!(key in v))
+      return { ok: false, message: `intervention missing field: ${key}` };
   }
-  if (!isString(v.intervention_id)) return { ok: false, message: "intervention.intervention_id must be string" };
-  if (!isString(v.session_id)) return { ok: false, message: "intervention.session_id must be string" };
-  if (!isString(v.device_id)) return { ok: false, message: "intervention.device_id must be string" };
-  if (!isString(v.intervention_arm)) return { ok: false, message: "intervention.intervention_arm must be string" };
-  if (!isNumber(v.milestone_minutes)) return { ok: false, message: "intervention.milestone_minutes must be number" };
-  if (!isNumber(v.prompt_variant)) return { ok: false, message: "intervention.prompt_variant must be number" };
-  if (!isNullableString(v.user_action)) return { ok: false, message: "intervention.user_action must be string|null" };
-  if (!isNumber(v.intervention_start_ts)) return { ok: false, message: "intervention.intervention_start_ts must be number" };
-  if (!isNullableNumber(v.intervention_end_ts)) return { ok: false, message: "intervention.intervention_end_ts must be number|null" };
+  if (!isString(v.intervention_id))
+    return {
+      ok: false,
+      message: "intervention.intervention_id must be string"
+    };
+  if (!isString(v.session_id))
+    return { ok: false, message: "intervention.session_id must be string" };
+  if (!isString(v.device_id))
+    return { ok: false, message: "intervention.device_id must be string" };
+  if (!isString(v.intervention_arm))
+    return {
+      ok: false,
+      message: "intervention.intervention_arm must be string"
+    };
+  if (!isNumber(v.milestone_minutes))
+    return {
+      ok: false,
+      message: "intervention.milestone_minutes must be number"
+    };
+  if (!isNumber(v.prompt_variant))
+    return { ok: false, message: "intervention.prompt_variant must be number" };
+  if (!isNullableString(v.user_action))
+    return {
+      ok: false,
+      message: "intervention.user_action must be string|null"
+    };
+  if (!isNumber(v.intervention_start_ts))
+    return {
+      ok: false,
+      message: "intervention.intervention_start_ts must be number"
+    };
+  if (!isNullableNumber(v.intervention_end_ts))
+    return {
+      ok: false,
+      message: "intervention.intervention_end_ts must be number|null"
+    };
   const intervention = {
     intervention_id: v.intervention_id,
     session_id: v.session_id,
@@ -5661,16 +5727,19 @@ function validateIntervention(v) {
   return { ok: true, value: intervention };
 }
 function validateOnboardingResponse(v) {
-  if (!isRecord(v)) return { ok: false, message: "onboarding_response must be an object" };
+  if (!isRecord(v))
+    return { ok: false, message: "onboarding_response must be an object" };
   const r = v;
   const getNullableString = (key) => {
     if (!(key in r) || r[key] === void 0 || r[key] === null) return null;
-    if (!isString(r[key])) throw new Error(`Invalid onboarding_response.${key}`);
+    if (!isString(r[key]))
+      throw new Error(`Invalid onboarding_response.${key}`);
     return r[key];
   };
   const getNullableNumber = (key) => {
     if (!(key in r) || r[key] === void 0 || r[key] === null) return null;
-    if (!isNumber(r[key])) throw new Error(`Invalid onboarding_response.${key}`);
+    if (!isNumber(r[key]))
+      throw new Error(`Invalid onboarding_response.${key}`);
     return r[key];
   };
   try {
@@ -5695,20 +5764,26 @@ function validateOnboardingResponse(v) {
     };
     return { ok: true, value: onboarding };
   } catch (e) {
-    return { ok: false, message: `onboarding_response invalid: ${e?.message ?? String(e)}` };
+    return {
+      ok: false,
+      message: `onboarding_response invalid: ${e?.message ?? String(e)}`
+    };
   }
 }
 function validateExitSurveyResponse(v) {
-  if (!isRecord(v)) return { ok: false, message: "exit_survey_response must be an object" };
+  if (!isRecord(v))
+    return { ok: false, message: "exit_survey_response must be an object" };
   const r = v;
   const getNullableString = (key) => {
     if (!(key in r) || r[key] === void 0 || r[key] === null) return null;
-    if (!isString(r[key])) throw new Error(`Invalid exit_survey_response.${key}`);
+    if (!isString(r[key]))
+      throw new Error(`Invalid exit_survey_response.${key}`);
     return r[key];
   };
   const getNullableNumber = (key) => {
     if (!(key in r) || r[key] === void 0 || r[key] === null) return null;
-    if (!isNumber(r[key])) throw new Error(`Invalid exit_survey_response.${key}`);
+    if (!isNumber(r[key]))
+      throw new Error(`Invalid exit_survey_response.${key}`);
     return r[key];
   };
   try {
@@ -5727,7 +5802,10 @@ function validateExitSurveyResponse(v) {
     };
     return { ok: true, value: exit };
   } catch (e) {
-    return { ok: false, message: `exit_survey_response invalid: ${e?.message ?? String(e)}` };
+    return {
+      ok: false,
+      message: `exit_survey_response invalid: ${e?.message ?? String(e)}`
+    };
   }
 }
 function validatePayload(body) {
@@ -5740,6 +5818,14 @@ function validatePayload(body) {
   }
   if (!("interventions" in body) || !Array.isArray(body.interventions)) {
     return { ok: false, message: "interventions must be an array" };
+  }
+  let enrolled_at = void 0;
+  if ("enrolled_at" in body) {
+    const raw = body.enrolled_at;
+    if (!isNullableNumber(raw)) {
+      return { ok: false, message: "enrolled_at must be number|null" };
+    }
+    enrolled_at = raw;
   }
   const sessions = [];
   for (const s of body.sessions) {
@@ -5779,6 +5865,7 @@ function validatePayload(body) {
     ok: true,
     value: {
       device_id: body.device_id,
+      enrolled_at,
       sessions,
       interventions,
       onboarding_response,
@@ -5864,6 +5951,7 @@ var handler = async (event) => {
   const payload = validated.value;
   console.log("INGESTION_REQUEST", {
     device_id: payload.device_id,
+    enrolled_at: payload.enrolled_at ?? null,
     sessions: payload.sessions.length,
     interventions: payload.interventions.length
   });

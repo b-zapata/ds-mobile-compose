@@ -2,6 +2,7 @@ package study.doomscrolling.app.data.upload
 
 data class UploadPayload(
     val deviceId: String,
+    val enrolledAt: Long?,
     val sessions: List<UploadSession>,
     val interventions: List<UploadIntervention>
 )
