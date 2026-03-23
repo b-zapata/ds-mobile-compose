@@ -1,7 +1,7 @@
 package study.doomscrolling.app.domain.study
 
 object StudyWindow {
-    const val STUDY_DURATION_MS: Long = 7L * 24L * 60L * 60L * 1000L
+    const val STUDY_DURATION_MS: Long = 10L * 60L * 1000L
 
     fun studyEndAt(enrolledAt: Long?): Long? = enrolledAt?.plus(STUDY_DURATION_MS)
 

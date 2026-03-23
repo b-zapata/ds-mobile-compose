@@ -2,6 +2,8 @@ package study.doomscrolling.app.ui.screens
 
 import androidx.compose.animation.*
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowForward
@@ -11,11 +13,16 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import study.doomscrolling.app.viewmodel.ExitSurveyViewModel
+import study.doomscrolling.app.data.database.AppDatabase
+import study.doomscrolling.app.data.entities.DeviceEntity
+import study.doomscrolling.app.domain.study.StudyWindow
+import kotlin.math.roundToInt
 
 @Composable
 fun ExitSurveyScreen(
@@ -23,18 +30,21 @@ fun ExitSurveyScreen(
     viewModel: ExitSurveyViewModel = viewModel()
 ) {
     var currentStep by rememberSaveable { mutableIntStateOf(0) }
+    var showingStats by rememberSaveable { mutableStateOf(true) }
     val totalSteps = 10
     val progress = (currentStep + 1).toFloat() / totalSteps.toFloat()
 
     Scaffold(
         topBar = {
             Column(modifier = Modifier.statusBarsPadding()) {
-                LinearProgressIndicator(
-                    progress = progress,
-                    modifier = Modifier.fillMaxWidth(),
-                    color = MaterialTheme.colorScheme.primary,
-                    trackColor = MaterialTheme.colorScheme.surfaceVariant
-                )
+                if (!showingStats) {
+                    LinearProgressIndicator(
+                        progress = progress,
+                        modifier = Modifier.fillMaxWidth(),
+                        color = MaterialTheme.colorScheme.primary,
+                        trackColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                }
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -42,7 +52,7 @@ fun ExitSurveyScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    if (currentStep > 0) {
+                    if (!showingStats && currentStep > 0) {
                         IconButton(onClick = { currentStep-- }) {
                             Icon(Icons.Default.ArrowBack, contentDescription = "Back")
                         }
@@ -50,22 +60,30 @@ fun ExitSurveyScreen(
                         Spacer(modifier = Modifier.size(48.dp))
                     }
                     
-                    val isPart1 = currentStep < 7
-                    val partLabel = if (isPart1) "Part 1 of 2: Experience" else "Part 2 of 2: Feedback"
-                    val relativeStep = if (isPart1) currentStep + 1 else currentStep - 6
-                    val relativeTotal = if (isPart1) 7 else 3
-
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    if (showingStats) {
                         Text(
-                            text = partLabel,
-                            style = MaterialTheme.typography.labelMedium,
+                            text = "Your Results",
+                            style = MaterialTheme.typography.labelLarge,
                             color = MaterialTheme.colorScheme.primary
                         )
-                        Text(
-                            text = "Question $relativeStep of $relativeTotal",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                    } else {
+                        val isPart1 = currentStep < 7
+                        val partLabel = if (isPart1) "Part 1 of 2: Experience" else "Part 2 of 2: Feedback"
+                        val relativeStep = if (isPart1) currentStep + 1 else currentStep - 6
+                        val relativeTotal = if (isPart1) 7 else 3
+
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = partLabel,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Text(
+                                text = "Question $relativeStep of $relativeTotal",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                     
                     Spacer(modifier = Modifier.size(48.dp))
@@ -81,30 +99,41 @@ fun ExitSurveyScreen(
                         .navigationBarsPadding(),
                     horizontalArrangement = Arrangement.End
                 ) {
-                    if (currentStep < totalSteps - 1) {
+                    if (showingStats) {
                         Button(
-                            onClick = { currentStep++ },
-                            enabled = isStepValid(currentStep, viewModel)
+                            onClick = { showingStats = false },
+                            modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text("Next")
+                            Text("Continue to Survey")
                             Spacer(modifier = Modifier.width(8.dp))
                             Icon(Icons.Default.ArrowForward, contentDescription = null)
                         }
                     } else {
-                        Button(
-                            onClick = { viewModel.submitSurvey(onComplete) },
-                            enabled = !viewModel.isSubmitting && isStepValid(currentStep, viewModel)
-                        ) {
-                            if (viewModel.isSubmitting) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(24.dp),
-                                    color = MaterialTheme.colorScheme.onPrimary,
-                                    strokeWidth = 2.dp
-                                )
-                            } else {
-                                Text("Complete")
+                        if (currentStep < totalSteps - 1) {
+                            Button(
+                                onClick = { currentStep++ },
+                                enabled = isStepValid(currentStep, viewModel)
+                            ) {
+                                Text("Next")
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Icon(Icons.Default.Check, contentDescription = null)
+                                Icon(Icons.Default.ArrowForward, contentDescription = null)
+                            }
+                        } else {
+                            Button(
+                                onClick = { viewModel.submitSurvey(onComplete) },
+                                enabled = !viewModel.isSubmitting && isStepValid(currentStep, viewModel)
+                            ) {
+                                if (viewModel.isSubmitting) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(24.dp),
+                                        color = MaterialTheme.colorScheme.onPrimary,
+                                        strokeWidth = 2.dp
+                                    )
+                                } else {
+                                    Text("Complete")
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Icon(Icons.Default.Check, contentDescription = null)
+                                }
                             }
                         }
                     }
@@ -120,7 +149,7 @@ fun ExitSurveyScreen(
             contentAlignment = Alignment.Center
         ) {
             AnimatedContent(
-                targetState = currentStep,
+                targetState = if (showingStats) -1 else currentStep,
                 transitionSpec = {
                     if (targetState > initialState) {
                         (slideInHorizontally { it } + fadeIn()).togetherWith(slideOutHorizontally { -it } + fadeOut())
@@ -136,6 +165,7 @@ fun ExitSurveyScreen(
                     verticalArrangement = Arrangement.Center
                 ) {
                     when (step) {
+                        -1 -> UsageStatsView()
                         0 -> LikertStep(
                             question = "During the study, how often did the interruptions make you more aware of how long you had been using an app?",
                             value = viewModel.interruptionAwareness,
@@ -305,3 +335,245 @@ private fun isStepValid(step: Int, viewModel: ExitSurveyViewModel): Boolean {
         else -> true // Likert scales are always valid as they have a default value
     }
 }
+
+@Composable
+private fun UsageStatsView() {
+    val context = LocalContext.current
+    val scrollState = rememberScrollState()
+    
+    var baselineStats by remember { mutableStateOf<List<AppUsageInfo>>(emptyList()) }
+    var interventionStats by remember { mutableStateOf<List<AppUsageInfo>>(emptyList()) }
+    var baselineDaily by remember { mutableStateOf(0.0) }
+    var interventionDaily by remember { mutableStateOf(0.0) }
+    var isLoading by remember { mutableStateOf(true) }
+    
+    LaunchedEffect(context) {
+        try {
+            val db = AppDatabase.getInstance(context)
+            
+            // Get the device - getDevice() is already a suspend function
+            val device = db.deviceDao().getDevice() ?: return@LaunchedEffect
+            
+            // Get sessions for this device
+            val deviceId = device.deviceId
+            val sessions = db.sessionDao().getSessionsForDevice(deviceId)
+            val enrolledAt = device.enrolledAt ?: return@LaunchedEffect
+            
+            if (sessions.isEmpty()) {
+                isLoading = false
+                return@LaunchedEffect
+            }
+            
+            val firstSessionTime = sessions.minByOrNull { it.startTimestamp }?.startTimestamp ?: return@LaunchedEffect
+            val baselineEndTime = firstSessionTime + (7 * 24 * 60 * 60 * 1000L) // 7 days
+            
+            val baselineSessions = sessions.filter { 
+                it.startTimestamp >= firstSessionTime && it.startTimestamp < baselineEndTime 
+            }
+            val interventionSessions = sessions.filter { 
+                it.startTimestamp >= enrolledAt 
+            }
+            
+            // Aggregate by app (convert seconds to milliseconds)
+            val baselineMap = baselineSessions.groupBy { it.packageName }
+                .mapValues { (_, sessionList) -> sessionList.sumOf { (it.durationSeconds ?: 0L) * 1000L } }
+            
+            val interventionMap = interventionSessions.groupBy { it.packageName }
+                .mapValues { (_, sessionList) -> sessionList.sumOf { (it.durationSeconds ?: 0L) * 1000L } }
+            
+            // Calculate daily averages
+            val baselineDays = (baselineEndTime - firstSessionTime) / (24 * 60 * 60 * 1000.0)
+            val interventionDays = (System.currentTimeMillis() - enrolledAt) / (24 * 60 * 60 * 1000.0)
+            
+            baselineDaily = if (baselineDays > 0) baselineMap.values.sum() / 1000.0 / 60.0 / baselineDays else 0.0
+            interventionDaily = if (interventionDays > 0) interventionMap.values.sum() / 1000.0 / 60.0 / interventionDays else 0.0
+            
+            baselineStats = baselineMap
+                .map { (pkg, ms) -> AppUsageInfo(pkg, ms / 1000.0 / 60.0) }
+                .sortedByDescending { it.minutesUsed }
+                .take(5)
+            
+            interventionStats = interventionMap
+                .map { (pkg, ms) -> AppUsageInfo(pkg, ms / 1000.0 / 60.0) }
+                .sortedByDescending { it.minutesUsed }
+                .take(5)
+            
+            isLoading = false
+        } catch (e: Exception) {
+            isLoading = false
+        }
+    }
+    
+    if (isLoading) {
+        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator()
+        }
+    } else {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(scrollState),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "Your Usage Overview",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center
+            )
+            
+            Spacer(modifier = Modifier.height(24.dp))
+            
+            // Daily average comparison
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                StatCard(
+                    title = "Baseline Period",
+                    value = formatMinutes(baselineDaily),
+                    unit = "min/day"
+                )
+                StatCard(
+                    title = "Study Period",
+                    value = formatMinutes(interventionDaily),
+                    unit = "min/day"
+                )
+            }
+            
+            Spacer(modifier = Modifier.height(32.dp))
+            
+            // Top apps
+            Text(
+                text = "Top Apps Used",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            if (baselineStats.isNotEmpty() || interventionStats.isNotEmpty()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    // Baseline apps
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Baseline",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        baselineStats.forEach { app ->
+                            AppUsageRow(app)
+                        }
+                    }
+                    
+                    // Intervention apps
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Study Period",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        interventionStats.forEach { app ->
+                            AppUsageRow(app)
+                        }
+                    }
+                }
+            } else {
+                Text(
+                    text = "No usage data available",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(24.dp)
+                )
+            }
+            
+            Spacer(modifier = Modifier.height(24.dp))
+        }
+    }
+}
+
+@Composable
+private fun StatCard(
+    title: String,
+    value: String,
+    unit: String
+) {
+    Surface(
+        modifier = Modifier
+            .width(140.dp)
+            .padding(8.dp),
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        tonalElevation = 2.dp
+    ) {
+        Column(
+            modifier = Modifier
+                .padding(16.dp)
+                .fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = value,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = unit,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+private fun AppUsageRow(app: AppUsageInfo) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = app.packageName.substringAfterLast('.'),
+            style = MaterialTheme.typography.labelSmall,
+            maxLines = 1,
+            modifier = Modifier.weight(1f),
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Text(
+            text = formatMinutes(app.minutesUsed),
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.primary
+        )
+    }
+}
+
+private fun formatMinutes(minutes: Double): String {
+    return if (minutes >= 60) {
+        val hours = minutes / 60
+        String.format("%.1f h", hours)
+    } else {
+        String.format("%.0f m", minutes)
+    }
+}
+
+private data class AppUsageInfo(
+    val packageName: String,
+    val minutesUsed: Double
+)

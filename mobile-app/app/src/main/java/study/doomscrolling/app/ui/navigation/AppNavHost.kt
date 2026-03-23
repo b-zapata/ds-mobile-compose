@@ -13,6 +13,7 @@ object AppDestinations {
     const val PERMISSIONS = "permissions"
     const val ELIGIBILITY = "eligibility"
     const val ONBOARDING = "onboarding"
+    const val DEBRIEF = "debrief"
     const val EXIT_SURVEY = "exit_survey"
     const val DASHBOARD = "dashboard"
     const val BASELINE_STATS = "baseline_stats"
@@ -48,6 +49,11 @@ fun AppNavHost(
                 onComplete = { navController.navigate(AppDestinations.DASHBOARD) }
             )
         }
+        composable(AppDestinations.DEBRIEF) {
+            DebriefScreen(
+                onComplete = { navController.navigate(AppDestinations.DASHBOARD) }
+            )
+        }
         composable(AppDestinations.EXIT_SURVEY) {
             ExitSurveyScreen(
                 onComplete = { navController.navigate(AppDestinations.DASHBOARD) }
@@ -59,6 +65,7 @@ fun AppNavHost(
                 onNavigateToPermissions = { navController.navigate(AppDestinations.PERMISSIONS) },
                 onNavigateToEligibility = { navController.navigate(AppDestinations.ELIGIBILITY) },
                 onNavigateToOnboarding = { navController.navigate(AppDestinations.ONBOARDING) },
+                onNavigateToDebrief = { navController.navigate(AppDestinations.DEBRIEF) },
                 onNavigateToExitSurvey = { navController.navigate(AppDestinations.EXIT_SURVEY) },
                 onOpenBaselineStats = {
                     if (BuildConfig.DEBUG) {
