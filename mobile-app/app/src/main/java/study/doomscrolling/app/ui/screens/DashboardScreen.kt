@@ -120,9 +120,13 @@ fun DashboardScreen(
             }
 
             val diff = endAt - now
+            val days = diff / (24 * 60 * 60 * 1000)
             val hours = (diff / (60 * 60 * 1000)) % 24
             val minutes = (diff / (60 * 1000)) % 60
-            timeRemainingText = "$hours hours, $minutes minutes remaining"
+            timeRemainingText = when {
+                days > 0 -> "$days days, $hours hours, $minutes minutes remaining"
+                else -> "$hours hours, $minutes minutes remaining"
+            }
             delay(1000)
         }
     }
