@@ -549,7 +549,7 @@ private fun AppUsageRow(app: AppUsageInfo) {
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            text = app.packageName.substringAfterLast('.'),
+            text = displayAppName(app.packageName),
             style = MaterialTheme.typography.labelSmall,
             maxLines = 1,
             modifier = Modifier.weight(1f),
@@ -561,6 +561,36 @@ private fun AppUsageRow(app: AppUsageInfo) {
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.primary
         )
+    }
+}
+
+private fun displayAppName(packageName: String): String {
+    val knownNames = mapOf(
+        "com.instagram.android" to "Instagram",
+        "com.zhiliaoapp.musically" to "TikTok",
+        "com.twitter.android" to "X",
+        "com.reddit.frontpage" to "Reddit",
+        "com.facebook.katana" to "Facebook",
+        "com.google.android.youtube" to "YouTube",
+        "com.threads.android" to "Threads",
+        "com.spotify.music" to "Spotify"
+    )
+
+    knownNames[packageName]?.let { return it }
+
+    val genericSegments = setOf("android", "app", "apps", "mobile", "phone", "release")
+    val segments = packageName.split('.')
+        .map { it.trim() }
+        .filter { it.isNotEmpty() }
+
+    val bestSegment = segments
+        .asReversed()
+        .firstOrNull { it !in genericSegments }
+        ?: segments.lastOrNull()
+        ?: packageName
+
+    return bestSegment.replaceFirstChar { char ->
+        if (char.isLowerCase()) char.titlecase() else char.toString()
     }
 }
 

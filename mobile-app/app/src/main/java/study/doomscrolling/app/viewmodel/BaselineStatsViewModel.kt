@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import study.doomscrolling.app.BuildConfig
 import study.doomscrolling.app.data.database.AppDatabase
 import study.doomscrolling.app.data.repository.BaselineStats
 import study.doomscrolling.app.data.repository.SessionRepository
@@ -33,7 +34,13 @@ class BaselineStatsViewModel(application: Application) : AndroidViewModel(applic
     fun refresh() {
         viewModelScope.launch {
             _uiState.value = BaselineStatsUiState(loading = true)
-            val stats = repository.getBaselineStats()
+            var stats = repository.getBaselineStats()
+
+            if (BuildConfig.DEBUG && stats.totalSessions == 0) {
+                repository.importBaselineFromUsageStats(getApplication())
+                stats = repository.getBaselineStats()
+            }
+
             _uiState.value = BaselineStatsUiState(stats = stats, loading = false)
         }
     }

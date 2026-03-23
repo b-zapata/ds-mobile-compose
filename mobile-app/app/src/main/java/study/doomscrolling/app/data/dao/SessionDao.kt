@@ -25,6 +25,9 @@ interface SessionDao {
     @Query("SELECT * FROM sessions ORDER BY session_start_ts DESC")
     suspend fun getSessions(): List<SessionEntity>
 
+    @Query("SELECT * FROM sessions WHERE uploaded_at IS NULL ORDER BY session_start_ts DESC")
+    suspend fun getPendingSessions(): List<SessionEntity>
+
     @Query("SELECT * FROM sessions WHERE device_id = :deviceId ORDER BY session_start_ts DESC")
     suspend fun getSessionsForDevice(deviceId: String): List<SessionEntity>
 
@@ -46,6 +49,9 @@ interface SessionDao {
 
     @Query("DELETE FROM sessions WHERE session_id IN (:ids)")
     suspend fun deleteSessions(ids: List<String>)
+
+    @Query("UPDATE sessions SET uploaded_at = :uploadedAt WHERE session_id IN (:ids)")
+    suspend fun markSessionsUploaded(ids: List<String>, uploadedAt: Long)
 
     /** Delete sessions that started in [startMs, endMs). Used to clear baseline window before re-import. */
     @Query("DELETE FROM sessions WHERE session_start_ts >= :startMs AND session_start_ts < :endMs")

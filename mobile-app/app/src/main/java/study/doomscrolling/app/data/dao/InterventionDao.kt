@@ -15,6 +15,9 @@ interface InterventionDao {
     @Query("SELECT * FROM interventions")
     suspend fun getInterventions(): List<InterventionEntity>
 
+    @Query("SELECT * FROM interventions WHERE uploaded_at IS NULL")
+    suspend fun getPendingInterventions(): List<InterventionEntity>
+
     @Query("SELECT * FROM interventions WHERE session_id = :sessionId ORDER BY intervention_start_ts DESC")
     suspend fun getInterventionsForSession(sessionId: String): List<InterventionEntity>
 
@@ -23,6 +26,9 @@ interface InterventionDao {
 
     @Query("DELETE FROM interventions WHERE intervention_id IN (:ids)")
     suspend fun deleteInterventions(ids: List<String>)
+
+    @Query("UPDATE interventions SET uploaded_at = :uploadedAt WHERE intervention_id IN (:ids)")
+    suspend fun markInterventionsUploaded(ids: List<String>, uploadedAt: Long)
 
     @Query(
         "UPDATE interventions " +

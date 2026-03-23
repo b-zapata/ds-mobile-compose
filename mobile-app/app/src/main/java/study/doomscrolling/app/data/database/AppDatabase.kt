@@ -15,7 +15,7 @@ import study.doomscrolling.app.data.entities.*
         OnboardingResponseEntity::class,
         ExitSurveyResponseEntity::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
