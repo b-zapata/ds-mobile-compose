@@ -13,8 +13,8 @@ class UploadRepository(
 
     suspend fun uploadPendingLogs(): Boolean {
         val device = deviceDao.getDevice() ?: return false
-        val sessions = sessionDao.getSessions()
-        val interventions = interventionDao.getInterventions()
+        val sessions = sessionDao.getPendingSessions()
+        val interventions = interventionDao.getPendingInterventions()
 
         if (sessions.isEmpty() && interventions.isEmpty()) {
             return true
@@ -22,11 +22,12 @@ class UploadRepository(
 
         val success = uploadApi.uploadLogs(device.deviceId, sessions, interventions)
         if (success) {
+            val uploadedAt = System.currentTimeMillis()
             if (sessions.isNotEmpty()) {
-                sessionDao.deleteSessions(sessions.map { it.sessionId })
+                sessionDao.markSessionsUploaded(sessions.map { it.sessionId }, uploadedAt)
             }
             if (interventions.isNotEmpty()) {
-                interventionDao.deleteInterventions(interventions.map { it.interventionId })
+                interventionDao.markInterventionsUploaded(interventions.map { it.interventionId }, uploadedAt)
             }
         }
         return success

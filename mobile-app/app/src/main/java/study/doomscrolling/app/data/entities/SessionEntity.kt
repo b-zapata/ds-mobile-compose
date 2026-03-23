@@ -39,6 +39,8 @@ data class SessionEntity(
     val endTimestamp: Long? = null,
     @ColumnInfo(name = "duration_seconds")
     val durationSeconds: Long? = null,
+    @ColumnInfo(name = "uploaded_at")
+    val uploadedAt: Long? = null,
     @ColumnInfo(name = "created_at")
     val createdAt: Long
 )

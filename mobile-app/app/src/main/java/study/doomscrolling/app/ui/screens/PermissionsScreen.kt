@@ -57,7 +57,7 @@ fun PermissionsScreen(
         )
         Spacer(modifier = Modifier.height(16.dp))
         Text(
-            text = "To participate in this study, the app needs these three permissions:",
+            text = "To participate in this study, the app needs these permissions:",
             style = MaterialTheme.typography.bodyMedium,
             textAlign = TextAlign.Center
         )
@@ -88,6 +88,19 @@ fun PermissionsScreen(
                 }
             }
         )
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = "If your phone blocks permission changes for sideloaded apps, open App info and enable 'Allow restricted settings'.",
+                style = MaterialTheme.typography.bodySmall,
+                textAlign = TextAlign.Center
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Button(onClick = { openAppDetailsSettings(context) }) {
+                Text("Open App Info")
+            }
+        }
 
         Spacer(modifier = Modifier.height(48.dp))
 
@@ -155,4 +168,14 @@ private fun openOverlaySettings(context: android.content.Context) {
         }
         context.startActivity(intent)
     }
+}
+
+private fun openAppDetailsSettings(context: android.content.Context) {
+    val intent = Intent(
+        Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+        Uri.parse("package:${context.packageName}")
+    ).apply {
+        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+    }
+    context.startActivity(intent)
 }

@@ -48,6 +48,8 @@ data class InterventionEntity(
     val interventionEndTs: Long? = null,
     @ColumnInfo(name = "user_action")
     val userAction: String? = null,
+    @ColumnInfo(name = "uploaded_at")
+    val uploadedAt: Long? = null,
     @ColumnInfo(name = "created_at")
     val createdAt: Long
 )

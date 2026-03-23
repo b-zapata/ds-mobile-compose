@@ -19,11 +19,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import study.doomscrolling.app.BuildConfig
 import study.doomscrolling.app.data.database.AppDatabase
 import study.doomscrolling.app.data.entities.ExitSurveyResponseEntity
 import study.doomscrolling.app.data.entities.OnboardingResponseEntity
+import study.doomscrolling.app.domain.study.DebriefProgress
 import study.doomscrolling.app.domain.study.StudyWindow
 import study.doomscrolling.app.services.ForegroundAppDetector
 import study.doomscrolling.app.workers.UploadWorker
@@ -35,6 +37,7 @@ fun DashboardScreen(
     onNavigateToPermissions: () -> Unit = {},
     onNavigateToEligibility: () -> Unit = {},
     onNavigateToOnboarding: () -> Unit = {},
+    onNavigateToDebrief: () -> Unit = {},
     onNavigateToExitSurvey: () -> Unit = {},
     onOpenBaselineStats: () -> Unit = {},
     onOpenPromptTest: () -> Unit = {}
@@ -74,6 +77,16 @@ fun DashboardScreen(
         }
     }
     val hasExited = exitSurvey != null
+
+    var hasDebriefed by remember { mutableStateOf(false) }
+    LaunchedEffect(device?.deviceId) {
+        val deviceId = device?.deviceId
+        hasDebriefed = if (deviceId != null) {
+            DebriefProgress.isCompleted(context, deviceId)
+        } else {
+            false
+        }
+    }
     
     var timeRemainingText by remember { mutableStateOf<String?>(null) }
     var studyCompleted by remember { mutableStateOf(false) }
@@ -85,22 +98,32 @@ fun DashboardScreen(
     }
 
     // Refresh states from System and handle countdown
-    LaunchedEffect(device) {
+    LaunchedEffect(device?.enrolledAt) {
         hasPermissions = ForegroundAppDetector.hasUsageStatsPermission(context) &&
                 Settings.canDrawOverlays(context)
         
         val enrolledAt = device?.enrolledAt
-        if (enrolledAt != null) {
+        if (enrolledAt == null) {
+            studyCompleted = false
+            timeRemainingText = null
+            return@LaunchedEffect
+        }
+
+        val endAt = StudyWindow.studyEndAt(enrolledAt) ?: enrolledAt
+        while (true) {
             val now = System.currentTimeMillis()
-            val endAt = StudyWindow.studyEndAt(enrolledAt) ?: enrolledAt
             studyCompleted = now >= endAt
-            
-            if (!studyCompleted) {
-                val diff = endAt - now
-                val hours = (diff / (60 * 60 * 1000)) % 24
-                val minutes = (diff / (60 * 1000)) % 60
-                timeRemainingText = "$hours hours, $minutes minutes remaining"
+
+            if (studyCompleted) {
+                timeRemainingText = null
+                break
             }
+
+            val diff = endAt - now
+            val hours = (diff / (60 * 60 * 1000)) % 24
+            val minutes = (diff / (60 * 1000)) % 60
+            timeRemainingText = "$hours hours, $minutes minutes remaining"
+            delay(1000)
         }
     }
 
@@ -163,10 +186,21 @@ fun DashboardScreen(
                     subtitle = if (isEligible && !studyCompleted) timeRemainingText ?: "Study in progress" else null
                 )
                 ChecklistItem(
+                    title = "Read debrief statement",
+                    isCompleted = hasDebriefed,
+                    subtitle = if (studyCompleted && !hasDebriefed) "Ready to complete" else null,
+                    onClick = if (studyCompleted && !hasDebriefed) onNavigateToDebrief else null
+                )
+                ChecklistItem(
                     title = "Fill out exit survey",
                     isCompleted = hasExited,
-                    subtitle = if (studyCompleted && !hasExited) "Ready to complete" else null,
-                    onClick = if (studyCompleted && !hasExited) onNavigateToExitSurvey else null
+                    subtitle = when {
+                        !studyCompleted -> null
+                        !hasDebriefed -> "Complete debrief first"
+                        !hasExited -> "Ready to complete"
+                        else -> null
+                    },
+                    onClick = if (studyCompleted && hasDebriefed && !hasExited) onNavigateToExitSurvey else null
                 )
 
                 if (BuildConfig.DEBUG) {
