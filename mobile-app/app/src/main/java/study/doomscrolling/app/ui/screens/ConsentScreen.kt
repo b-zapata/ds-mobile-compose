@@ -7,6 +7,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
@@ -18,16 +21,21 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import study.doomscrolling.app.viewmodel.ConsentViewModel
 
 @Composable
 fun ConsentScreen(
-    onAccept: () -> Unit
+    onAccept: () -> Unit,
+    viewModel: ConsentViewModel = viewModel()
 ) {
     val scrollState = rememberScrollState()
 
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .statusBarsPadding()
+            .padding(horizontal = 16.dp)
             .verticalScroll(scrollState),
         horizontalAlignment = Alignment.Start,
         verticalArrangement = Arrangement.Top
@@ -64,7 +72,7 @@ Participation in this study is voluntary.
 
 Purpose of the Study
 
-The purpose of this study is to evaluate how short interruptions during social media use affect how people interact with mobile apps. The research aims to better understand whether brief prompts or tasks can help people pause and reflect on their phone usage and decide whether they want to continue using an app.
+The purpose of this study is to evaluate how short interruptions during social media use affect how people interact with mobile apps. The research aims to better understand whether brief prompts or tasks can help people pause and reflect on their phone usage and decide whether they want continue using an app.
 
 What You Will Be Asked to Do
 
@@ -77,6 +85,7 @@ If you choose to participate in this study, you will be asked to:
 The research application monitors usage of certain social media apps, including:
 - YouTube
 - Instagram
+- Threads
 - Facebook
 - TikTok
 - X (formerly Twitter)
@@ -146,10 +155,14 @@ If you would like to participate in this study, please select “Accept” to co
 
         Column(
             modifier = Modifier
-                .fillMaxWidth(),
+                .fillMaxWidth()
+                .navigationBarsPadding(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Button(onClick = onAccept, contentPadding = PaddingValues(horizontal = 32.dp, vertical = 12.dp)) {
+            Button(
+                onClick = { viewModel.acceptConsent(onAccept) }, 
+                contentPadding = PaddingValues(horizontal = 32.dp, vertical = 12.dp)
+            ) {
                 Text("Accept")
             }
             Spacer(modifier = Modifier.height(24.dp))

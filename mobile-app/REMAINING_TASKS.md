@@ -102,17 +102,25 @@
   - Rapidly switch apps, lock/unlock phone, and ensure:
     - No duplicate or “stuck” interventions.
     - Session merging + minimum duration logic still behaves correctly.
+- **Debugging & Bug Fixes**
+  - [DONE] Fix: After closing the app once through intervention, subsequent opens show no interventions.
+  - Implement: Friction prompts (require interaction instead of just waiting).
+  - Optimize: Improve intervention trigger latency (reduce "slow to show up" delay).
+- **Notification Vignette**
+  - [DONE] Implement a "heads up" notification that slides from the top before an intervention.
+  - Timing strategy: 10 seconds before the milestone.
+- **Audio Management**
+  - [DONE] Implement muting of all audio/target apps during the 12-second intervention overlay to maximize prompt impact.
 
-### 10. Upload worker testing (nightly + manual)
-- **Manual trigger (debug)**
-  - Use the **Upload Now (Debug)** button to:
-    - Confirm `UPLOAD_WORKER_STARTED` → `UPLOAD_SUCCESS` in Logcat.
-    - Confirm new rows appear in Postgres (`sessions`, `interventions`).
-- **Scheduled run at ~3 AM**
-  - Verify WorkManager’s periodic job:
-    - Is enqueued with the correct constraints (network connected).
-    - Actually runs overnight on a test device (check logs the next morning).
-  - Confirm multiple nightly uploads do not create duplicates beyond what ingestion logic already handles.
+### 10. Final Verification & Server Integration
+- **Test scheduled upload worker**
+  - Verify `DailyUploadWorker` runs at ~3 AM.
+  - Confirm batch payloads (sessions + interventions) are properly formatted and successfully stored in Postgres.
+- **Verify exit survey submission**
+  - Complete the exit survey on a test device.
+  - Confirm the payload reaches the server and all fields (Likert + text) are recorded correctly in the database.
+- **Verify onboarding submission**
+  - [DONE] Confirm the 14-question survey correctly uploads all fields (including Readiness and Willingness) to the server.
 
 ### 11. Optional: in-app bug reporting
 - **Simple debug-only bug report feature (time permitting)**

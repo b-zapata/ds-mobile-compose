@@ -3,9 +3,15 @@ package study.doomscrolling.app.ui.overlay
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.content.Context
 import android.content.Intent
 import android.graphics.PixelFormat
+import android.media.AudioAttributes
+import android.media.AudioFocusRequest
+import android.media.AudioManager
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import android.view.Gravity
 import android.view.WindowManager
@@ -17,8 +23,12 @@ import androidx.savedstate.SavedStateRegistry
 import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
+import kotlinx.coroutines.flow.MutableStateFlow
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import study.doomscrolling.app.R
 import study.doomscrolling.app.domain.intervention.InterventionCompletionNotifier
+import study.doomscrolling.app.domain.study.StudyArm
 
 /**
  * Foreground service that displays the prompt overlay above other apps using WindowManager.
@@ -34,31 +44,100 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
     private var windowManager: WindowManager? = null
     private var currentInterventionId: String? = null
     private var currentSessionId: String? = null
+    private var currentStudyArm: StudyArm = StudyArm.CONTROL
+    
+    // Audio Focus management to mute other apps
+    private var audioManager: AudioManager? = null
+    private var audioFocusRequest: AudioFocusRequest? = null
+
+    // Manage timer in the service to ensure it ticks reliably
+    private val secondsLeftFlow = MutableStateFlow(12)
+    private val handler = Handler(Looper.getMainLooper())
+    private val timerRunnable = object : Runnable {
+        override fun run() {
+            if (secondsLeftFlow.value > 0) {
+                secondsLeftFlow.value -= 1
+                Log.d(TAG, "Timer Tick: ${secondsLeftFlow.value}")
+                handler.postDelayed(this, 1000)
+            }
+        }
+    }
 
     override fun onCreate() {
         super.onCreate()
         savedStateRegistryController.performRestore(null)
-        // performAttach() is not called: LifecycleService already attaches the registry.
         windowManager = getSystemService(WINDOW_SERVICE) as? WindowManager
+        audioManager = getSystemService(Context.AUDIO_SERVICE) as? AudioManager
         createNotificationChannel()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        val promptText = intent?.getStringExtra(EXTRA_PROMPT_TEXT) ?: return START_NOT_STICKY
+        val promptText = intent?.getStringExtra(EXTRA_PROMPT_TEXT) ?: return super.onStartCommand(intent, flags, startId)
+        
+        // If an intervention was already active and not dismissed, notify completion as 'skipped'
+        // before starting the new one.
+        val oldInterventionId = currentInterventionId
+        val oldSessionId = currentSessionId
+        if (oldInterventionId != null && oldSessionId != null && overlayView != null) {
+            Log.i(TAG, "New intervention triggered before old one dismissed; skipping old one.")
+            InterventionCompletionNotifier.notifyCompleted(oldInterventionId, oldSessionId, "skipped_by_new")
+        }
+
         currentInterventionId = intent.getStringExtra(EXTRA_INTERVENTION_ID)
         currentSessionId = intent.getStringExtra(EXTRA_SESSION_ID)
+        val armName = intent.getStringExtra(EXTRA_STUDY_ARM)
+        currentStudyArm = if (armName != null) StudyArm.valueOf(armName) else StudyArm.CONTROL
+        
         val notification = buildNotification()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             startForeground(NOTIFICATION_ID, notification, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
         } else {
             startForeground(NOTIFICATION_ID, notification)
         }
+        
+        requestMute()
+        
+        // Reset and start timer
+        secondsLeftFlow.value = 12
+        handler.removeCallbacks(timerRunnable)
+        handler.postDelayed(timerRunnable, 1000)
+        
         showOverlay(promptText)
-        return START_NOT_STICKY
+        return super.onStartCommand(intent, flags, startId)
+    }
+
+    private fun requestMute() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val playbackAttributes = AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_ASSISTANCE_NAVIGATION_GUIDANCE)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                .build()
+            
+            audioFocusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
+                .setAudioAttributes(playbackAttributes)
+                .setAcceptsDelayedFocusGain(false)
+                .setOnAudioFocusChangeListener { /* handle changes if needed */ }
+                .build()
+            
+            audioFocusRequest?.let { audioManager?.requestAudioFocus(it) }
+        } else {
+            @Suppress("DEPRECATION")
+            audioManager?.requestAudioFocus(null, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
+        }
+        Log.i(TAG, "Audio focus requested (muting/ducking other apps)")
+    }
+
+    private fun releaseMute() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            audioFocusRequest?.let { audioManager?.abandonAudioFocusRequest(it) }
+        } else {
+            @Suppress("DEPRECATION")
+            audioManager?.abandonAudioFocus(null)
+        }
+        Log.i(TAG, "Audio focus released")
     }
 
     private fun createNotificationChannel() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val channel = NotificationChannel(
             CHANNEL_ID,
             getString(R.string.notification_channel_overlay_name),
@@ -78,6 +157,16 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
 
     private fun showOverlay(promptText: String) {
         val wm = windowManager ?: return
+        
+        // DYNAMIC BUG FIX: Remove any existing overlay before adding a new one
+        removeOverlay()
+
+        // DYNAMIC FLAGS: Allow keyboard focus ONLY if the arm is FRICTION
+        var flags = WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
+        if (currentStudyArm != StudyArm.FRICTION) {
+            flags = flags or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+        }
+
         val layoutParams = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.MATCH_PARENT,
@@ -87,31 +176,27 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
                 @Suppress("DEPRECATION")
                 WindowManager.LayoutParams.TYPE_PHONE
             },
-            0,
+            flags,
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.CENTER
+            softInputMode = WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
         }
+        
         val composeView = ComposeView(this).apply {
             setViewTreeLifecycleOwner(this@OverlayService)
             setViewTreeSavedStateRegistryOwner(this@OverlayService)
             setContent {
+                val secondsLeft by secondsLeftFlow.collectAsState()
                 PromptOverlayView(
                     promptText = promptText,
+                    secondsLeft = secondsLeft,
+                    studyArm = currentStudyArm,
                     onContinue = {
-                        val interventionId = currentInterventionId
-                        val sessionId = currentSessionId
-                        if (interventionId != null && sessionId != null) {
-                            InterventionCompletionNotifier.notifyCompleted(
-                                interventionId = interventionId,
-                                sessionId = sessionId
-                            )
-                        } else {
-                            Log.w(TAG, "Missing intervention/session id on overlay completion")
-                        }
-                        removeOverlay()
-                        Log.i(TAG, "Prompt overlay dismissed")
-                        stopSelf()
+                        handleCompletion(action = "continued_session")
+                    },
+                    onCloseApp = {
+                        handleCompletion(action = "closed_app")
                     }
                 )
             }
@@ -120,10 +205,30 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
         wm.addView(composeView, layoutParams)
     }
 
+    private fun handleCompletion(action: String) {
+        val interventionId = currentInterventionId
+        val sessionId = currentSessionId
+        if (interventionId != null && sessionId != null) {
+            InterventionCompletionNotifier.notifyCompleted(
+                interventionId = interventionId,
+                sessionId = sessionId,
+                action = action
+            )
+        } else {
+            Log.w(TAG, "Missing intervention/session id on overlay completion")
+        }
+        
+        releaseMute()
+        removeOverlay()
+        Log.i(TAG, "Prompt overlay dismissed with action: $action")
+        stopSelf()
+    }
+
     private fun removeOverlay() {
         overlayView?.let { view ->
             try {
                 windowManager?.removeView(view)
+                Log.d(TAG, "Overlay view removed from WindowManager")
             } catch (e: Exception) {
                 Log.w(TAG, "Error removing overlay", e)
             }
@@ -132,6 +237,7 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
     }
 
     override fun onDestroy() {
+        releaseMute()
         removeOverlay()
         super.onDestroy()
     }
@@ -146,5 +252,6 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
         const val EXTRA_PROMPT_CATEGORY = "prompt_category"
         const val EXTRA_INTERVENTION_ID = "intervention_id"
         const val EXTRA_SESSION_ID = "session_id"
+        const val EXTRA_STUDY_ARM = "study_arm"
     }
 }

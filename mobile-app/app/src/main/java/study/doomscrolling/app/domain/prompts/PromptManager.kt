@@ -28,6 +28,7 @@ class PromptManager(
             putExtra(OverlayService.EXTRA_PROMPT_CATEGORY, prompt.category)
             putExtra(OverlayService.EXTRA_INTERVENTION_ID, interventionId)
             putExtra(OverlayService.EXTRA_SESSION_ID, sessionId)
+            putExtra(OverlayService.EXTRA_STUDY_ARM, prompt.arm.name)
         }
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
             context.startForegroundService(intent)

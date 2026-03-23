@@ -18,6 +18,9 @@ interface InterventionDao {
     @Query("SELECT * FROM interventions WHERE session_id = :sessionId ORDER BY intervention_start_ts DESC")
     suspend fun getInterventionsForSession(sessionId: String): List<InterventionEntity>
 
+    @Query("SELECT prompt_variant FROM interventions WHERE intervention_arm = :armKey")
+    suspend fun getUsedPromptVariants(armKey: String): List<Int>
+
     @Query("DELETE FROM interventions WHERE intervention_id IN (:ids)")
     suspend fun deleteInterventions(ids: List<String>)
 

@@ -7,10 +7,9 @@ package study.doomscrolling.app.domain.intervention
 object InterventionCompletionNotifier {
 
     @Volatile
-    var listener: ((interventionId: String, sessionId: String) -> Unit)? = null
+    var listener: ((interventionId: String, sessionId: String, action: String) -> Unit)? = null
 
-    fun notifyCompleted(interventionId: String, sessionId: String) {
-        listener?.invoke(interventionId, sessionId)
+    fun notifyCompleted(interventionId: String, sessionId: String, action: String) {
+        listener?.invoke(interventionId, sessionId, action)
     }
 }
-

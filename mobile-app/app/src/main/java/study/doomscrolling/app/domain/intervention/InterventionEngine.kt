@@ -1,16 +1,23 @@
 package study.doomscrolling.app.domain.intervention
 
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.content.Context
 import android.util.Log
+import androidx.core.app.NotificationCompat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import study.doomscrolling.app.R
 import study.doomscrolling.app.data.dao.InterventionDao
+import study.doomscrolling.app.data.dao.OnboardingResponseDao
 import study.doomscrolling.app.data.entities.InterventionEntity
 import study.doomscrolling.app.data.repository.SessionRepository
 import study.doomscrolling.app.domain.prompts.Prompt
 import study.doomscrolling.app.domain.prompts.PromptEngine
 import study.doomscrolling.app.domain.prompts.PromptManager
+import study.doomscrolling.app.domain.study.StudyArm
 import study.doomscrolling.app.domain.study.StudyArmManager
 import java.util.UUID
 
@@ -19,8 +26,10 @@ import java.util.UUID
  * intervention events, and shows the prompt overlay when configured.
  */
 class InterventionEngine(
+    private val context: Context,
     private val sessionRepository: SessionRepository,
     private val interventionDao: InterventionDao,
+    private val onboardingResponseDao: OnboardingResponseDao,
     private val studyArmManager: StudyArmManager,
     private val promptEngine: PromptEngine,
     private val promptManager: PromptManager
@@ -28,12 +37,30 @@ class InterventionEngine(
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var monitoringJob: kotlinx.coroutines.Job? = null
+    
+    @Volatile
+    private var isHeadsUpActive: Boolean = false
+
+    // Store the arm for the duration of the current session
+    @Volatile
+    private var currentSessionArm: StudyArm? = null
+
+    init {
+        createNotificationChannels()
+    }
+
+    fun isHeadsUpPending(): Boolean = isHeadsUpActive
 
     /**
-     * Start intervention scheduling for this session. Call when session starts.
+     * Start intervention scheduling for this session.
      */
     fun startMonitoring(sessionId: String, packageName: String, sessionStartMs: Long) {
         stopMonitoring()
+        
+        // Assign a single arm for this entire session
+        currentSessionArm = studyArmManager.getRandomArm()
+        Log.i(TAG, "Session started with arm: $currentSessionArm")
+
         monitoringJob = scope.launch {
             Log.i(TAG, "Intervention scheduler started")
             InterventionScheduler.schedule(this, sessionId, sessionStartMs, this@InterventionEngine).join()
@@ -41,31 +68,131 @@ class InterventionEngine(
     }
 
     /**
-     * Cancel intervention scheduling. Call when session ends.
+     * Cancel intervention scheduling.
      */
     fun stopMonitoring() {
         monitoringJob?.cancel()
         monitoringJob = null
+        isHeadsUpActive = false
+        currentSessionArm = null // Reset arm
+        val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        nm.cancel(SOFT_WARNING_NOTIFICATION_ID)
+        nm.cancel(HEADS_UP_NOTIFICATION_ID)
         Log.i(TAG, "Intervention scheduler stopped")
     }
 
     /**
-     * Verify session is still active, then persist intervention and log.
-     * Called by [InterventionScheduler] at each checkpoint.
+     * T-minus 60s: High-priority vignette, but silent.
      */
+    fun showSoftWarningNotification(milestoneMinutes: Int) {
+        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val notification = NotificationCompat.Builder(context, SOFT_WARNING_CHANNEL_ID)
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setContentTitle("Reflection point approaching")
+            .setContentText("A reflection pause will occur in 1 minute.")
+            .setPriority(NotificationCompat.PRIORITY_HIGH) 
+            .setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setFullScreenIntent(null, true) // Force peek/vignette
+            .setAutoCancel(true)
+            .build()
+
+        notificationManager.notify(SOFT_WARNING_NOTIFICATION_ID, notification)
+    }
+
+    /**
+     * T-minus 10s: High-priority vignette with alert sound.
+     */
+    fun showHeadsUpNotification(milestoneMinutes: Int) {
+        isHeadsUpActive = true
+        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        notificationManager.cancel(SOFT_WARNING_NOTIFICATION_ID)
+
+        val notification = NotificationCompat.Builder(context, HEADS_UP_CHANNEL_ID)
+            .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
+            .setContentTitle("Study Pause Coming")
+            .setContentText("A reflection pause will start in 10 seconds.")
+            .setPriority(NotificationCompat.PRIORITY_HIGH) 
+            .setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setFullScreenIntent(null, true) // Force peek/vignette
+            .setAutoCancel(true)
+            .build()
+
+        notificationManager.notify(HEADS_UP_NOTIFICATION_ID, notification)
+    }
+
+    private fun createNotificationChannels() {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            
+            // v5 Soft Channel: High Importance (Peeking) but SILENT
+            val softChannel = NotificationChannel(
+                SOFT_WARNING_CHANNEL_ID,
+                "Study Reflection Warnings",
+                NotificationManager.IMPORTANCE_HIGH 
+            ).apply {
+                description = "Silent peeking alerts 1 minute before a study pause"
+                enableLights(false)
+                enableVibration(false)
+                setSound(null, null)
+            }
+            
+            // v5 Heads-Up Channel: High Importance (Peeking) with SOUND
+            val headsUpChannel = NotificationChannel(
+                HEADS_UP_CHANNEL_ID,
+                "Heads-Up Notifications",
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "Slide-down warnings 10 seconds before a study pause"
+            }
+            
+            notificationManager.createNotificationChannel(softChannel)
+            notificationManager.createNotificationChannel(headsUpChannel)
+        }
+    }
+
     suspend fun triggerIntervention(
         sessionId: String,
         triggerType: String,
         checkpointMinutes: Int? = null
     ) {
+        isHeadsUpActive = false
+        val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        nm.cancel(SOFT_WARNING_NOTIFICATION_ID)
+        nm.cancel(HEADS_UP_NOTIFICATION_ID)
+
         val session = sessionRepository.getActiveSession(sessionId) ?: return
-        val studyArm = studyArmManager.getCurrentArm()
+        val onboarding = onboardingResponseDao.getOnboardingResponse(session.deviceId)
+        if (onboarding == null) {
+            Log.i(TAG, "Skipping intervention: Onboarding not completed yet.")
+            return
+        }
+
+        // Use the arm that was assigned when the session started
+        val studyArm = currentSessionArm ?: studyArmManager.getRandomArm()
         val milestoneMinutes = checkpointMinutes ?: 0
+
+        val personalization = if (studyArm == StudyArm.IDENTITY) {
+            mapOf(
+                "Trait 1" to onboarding.trait1,
+                "Trait 2" to onboarding.trait2,
+                "Trait 3" to onboarding.trait3,
+                "Goal 1" to onboarding.goal1,
+                "Goal 2" to onboarding.goal2,
+                "Goal 3" to onboarding.goal3,
+                "Role 1" to onboarding.role1,
+                "Role 2" to onboarding.role2,
+                "Role 3" to onboarding.role3
+            )
+        } else {
+            emptyMap()
+        }
 
         val promptInstance = promptEngine.selectPrompt(
             studyArm = studyArm,
-            milestoneMinutes = milestoneMinutes
+            milestoneMinutes = milestoneMinutes,
+            personalization = personalization
         )
+        
         val now = System.currentTimeMillis()
         val interventionId = UUID.randomUUID().toString()
         val entity = InterventionEntity(
@@ -81,14 +208,13 @@ class InterventionEngine(
             createdAt = now
         )
         interventionDao.insertIntervention(entity)
-        Log.i(TAG, "Intervention triggered" + (checkpointMinutes?.let { " at checkpoint $it minutes" } ?: ""))
 
         val prompt = Prompt(
             id = "arm_${studyArm.name.lowercase()}_${milestoneMinutes}_${promptInstance.promptVariant}",
             text = promptInstance.text,
-            category = "milestone_$milestoneMinutes"
+            category = "milestone_$milestoneMinutes",
+            arm = studyArm
         )
-        Log.i(TAG, "Prompt selected")
         promptManager.showPrompt(
             prompt = prompt,
             interventionId = interventionId,
@@ -96,29 +222,23 @@ class InterventionEngine(
         )
     }
 
-    /**
-     * Called when the overlay completes after the 12-second intervention.
-     * Updates end timestamp and user_action based on whether the session is still active.
-     */
-    fun onInterventionCompleted(interventionId: String, sessionId: String) {
+    fun onInterventionCompleted(interventionId: String, sessionId: String, action: String) {
         scope.launch {
             val endTimestamp = System.currentTimeMillis()
-            val sessionStillActive = sessionRepository.getActiveSession(sessionId) != null
-            val userAction = if (sessionStillActive) {
-                "continued_session"
-            } else {
-                "closed_app"
-            }
             interventionDao.updateInterventionCompletion(
                 interventionId = interventionId,
                 endTimestamp = endTimestamp,
-                userAction = userAction
+                userAction = action
             )
-            Log.i(TAG, "Intervention completed for $interventionId with action=$userAction")
+            Log.i(TAG, "Intervention completed for $interventionId with action=$action")
         }
     }
 
     companion object {
         private const val TAG = "InterventionEngine"
+        private const val SOFT_WARNING_CHANNEL_ID = "soft_warning_intervention_v5"
+        private const val HEADS_UP_CHANNEL_ID = "heads_up_intervention_v5"
+        private const val SOFT_WARNING_NOTIFICATION_ID = 1000
+        private const val HEADS_UP_NOTIFICATION_ID = 1001
     }
 }

@@ -12,8 +12,6 @@ data class DeviceEntity(
     @PrimaryKey
     @ColumnInfo(name = "device_id")
     val deviceId: String,
-    @ColumnInfo(name = "study_arm")
-    val studyArm: String?,
     @ColumnInfo(name = "app_version")
     val appVersion: String,
     @ColumnInfo(name = "enrolled_at")

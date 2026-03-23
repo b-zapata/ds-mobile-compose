@@ -7,6 +7,10 @@ Parameters:
     Type: String
     Description: Your public IP in CIDR form (e.g. 1.2.3.4/32) for direct DB access.
     Default: "0.0.0.0/32"
+  AllowedClientIpCidrParam2:
+    Type: String
+    Description: Additional public IP in CIDR form (e.g. 1.2.3.4/32) for direct DB access.
+    Default: "0.0.0.0/32"
   DbNameParam:
     Type: String
     Default: doomscrolling
@@ -18,17 +22,21 @@ Parameters:
     NoEcho: true
   BackupRetentionDaysParam:
     Type: Number
-    Default: 7
+    Default: 0
     Description: RDS automated backup retention in days.
   EnableDeletionProtectionParam:
     Type: String
-    Default: "true"
+    Default: "false"
     AllowedValues: ["true", "false"]
     Description: Enable deletion protection on the RDS instance.
   AdminTokenParam:
     Type: String
     NoEcho: true
     Default: ""
+  SchemaVersionParam:
+    Type: String
+    Default: "v1"
+    Description: Bump to force re-invocation of schema setup custom resource.
 
 Globals:
   Function:
@@ -39,7 +47,8 @@ Globals:
       - x86_64
 
 Conditions:
-  DeletionProtectionEnabled: !Equals [!Ref EnableDeletionProtectionParam, "true"]
+  DeletionProtectionEnabled:
+    !Equals [!Ref EnableDeletionProtectionParam, "true"]
 
 Resources:
   Vpc:
@@ -97,11 +106,31 @@ Resources:
       SubnetId: !Ref PublicSubnetB
       RouteTableId: !Ref PublicRouteTable
 
+  S3VpcEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.s3"
+      VpcId: !Ref Vpc
+      VpcEndpointType: Gateway
+      RouteTableIds:
+        - !Ref PublicRouteTable
+
   LambdaSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: Lambda access to RDS
       VpcId: !Ref Vpc
+      SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+          Description: Allow HTTPS for CloudFormation callbacks
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          CidrIp: 10.0.0.0/16
+          Description: Allow PostgreSQL within VPC
 
   RdsSecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -117,6 +146,10 @@ Resources:
           FromPort: 5432
           ToPort: 5432
           CidrIp: !Ref AllowedClientIpCidrParam
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          CidrIp: !Ref AllowedClientIpCidrParam2
 
   PostgresSubnetGroup:
     Type: AWS::RDS::DBSubnetGroup
@@ -128,6 +161,8 @@ Resources:
 
   PostgresInstance:
     Type: AWS::RDS::DBInstance
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
     Properties:
       Engine: postgres
       DBInstanceClass: db.t4g.micro
@@ -178,6 +213,50 @@ Resources:
         Sourcemap: true
         Target: es2020
 
+  SchemaSetupFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../server/ingestion
+      Handler: schemaSetup.handler
+      Environment:
+        Variables:
+          DB_HOST: !GetAtt PostgresInstance.Endpoint.Address
+          DB_PORT: !GetAtt PostgresInstance.Endpoint.Port
+          DB_NAME: !Ref DbNameParam
+          DB_USER: !Ref DbUserParam
+          DB_PASSWORD: !Ref DbPasswordParam
+          DB_SSL: "true"
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref LambdaSecurityGroup
+        SubnetIds:
+          - !Ref PublicSubnetA
+          - !Ref PublicSubnetB
+      Timeout: 60
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        EntryPoints:
+          - src/schemaSetup.ts
+        Minify: false
+        Sourcemap: true
+        Target: es2020
+
+  SchemaSetupInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref SchemaSetupFunction
+      Principal: cloudformation.amazonaws.com
+      SourceArn: !Sub arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${AWS::StackName}/*
+
+  SchemaSetupCustomResource:
+    Type: AWS::CloudFormation::CustomResource
+    DependsOn: PostgresInstance
+    Properties:
+      ServiceToken: !GetAtt SchemaSetupFunction.Arn
+      SchemaVersion: !Ref SchemaVersionParam
+
 Outputs:
   IngestionApiUrl:
     Description: HTTP API endpoint base URL
@@ -185,4 +264,3 @@ Outputs:
   PostgresEndpoint:
     Description: RDS PostgreSQL endpoint (host)
     Value: !GetAtt PostgresInstance.Endpoint.Address
-

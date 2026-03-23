@@ -1,5 +1,11 @@
 import { Client } from "pg";
-import { UploadIntervention, UploadPayload, UploadSession } from "./types";
+import {
+  UploadExitSurveyResponse,
+  UploadIntervention,
+  UploadOnboardingResponse,
+  UploadPayload,
+  UploadSession,
+} from "./types";
 
 type DbConfig = {
   host: string;
@@ -32,29 +38,57 @@ export function getDbConfigFromEnv(env: NodeJS.ProcessEnv): DbConfig | null {
   return { host, port, database, user, password, ssl };
 }
 
-export async function insertUploadPayload(payload: UploadPayload, config: DbConfig): Promise<void> {
+export async function insertUploadPayload(
+  payload: UploadPayload,
+  config: DbConfig,
+): Promise<void> {
+  const resolvedEnrolledAt =
+    payload.enrolled_at ??
+    payload.onboarding_response?.completed_at ??
+    (payload.sessions.length > 0
+      ? Math.min(...payload.sessions.map((s) => s.session_start_ts))
+      : null);
+
   const client = new Client({
     host: config.host,
     port: config.port,
     database: config.database,
     user: config.user,
     password: config.password,
-    ssl: config.ssl ? { rejectUnauthorized: false } : undefined
+    ssl: config.ssl ? { rejectUnauthorized: false } : undefined,
   });
 
   await client.connect();
   try {
     await client.query("BEGIN");
 
-    // devices: upsert by device_id. (Other columns may be null until Phase 12 expands.)
+    // devices: upsert by device_id and retain enrolled_at once known.
     await client.query(
       `
-      INSERT INTO devices (device_id)
-      VALUES ($1)
-      ON CONFLICT (device_id) DO NOTHING
+      INSERT INTO devices (device_id, enrolled_at)
+      VALUES ($1, to_timestamp($2 / 1000.0))
+      ON CONFLICT (device_id) DO UPDATE SET
+        enrolled_at = COALESCE(devices.enrolled_at, EXCLUDED.enrolled_at)
       `,
-      [payload.device_id]
+      [payload.device_id, resolvedEnrolledAt],
     );
+
+    // Optional survey responses, captured once per device.
+    if (payload.onboarding_response) {
+      await insertOnboardingResponse(
+        client,
+        payload.device_id,
+        payload.onboarding_response,
+      );
+    }
+
+    if (payload.exit_survey_response) {
+      await insertExitSurveyResponse(
+        client,
+        payload.device_id,
+        payload.exit_survey_response,
+      );
+    }
 
     if (payload.sessions.length > 0) {
       for (const s of payload.sessions) {
@@ -79,14 +113,32 @@ export async function insertUploadPayload(payload: UploadPayload, config: DbConf
       try {
         await client.query(
           `
-          INSERT INTO devices (device_id)
-          VALUES ($1)
-          ON CONFLICT (device_id) DO NOTHING
+          INSERT INTO devices (device_id, enrolled_at)
+          VALUES ($1, to_timestamp($2 / 1000.0))
+          ON CONFLICT (device_id) DO UPDATE SET
+            enrolled_at = COALESCE(devices.enrolled_at, EXCLUDED.enrolled_at)
           `,
-          [payload.device_id]
+          [payload.device_id, resolvedEnrolledAt],
         );
         for (const s of payload.sessions) await insertSession(client, s);
-        for (const i of payload.interventions) await insertIntervention(client, i);
+        for (const i of payload.interventions)
+          await insertIntervention(client, i);
+
+        if (payload.onboarding_response) {
+          await insertOnboardingResponse(
+            client,
+            payload.device_id,
+            payload.onboarding_response,
+          );
+        }
+        if (payload.exit_survey_response) {
+          await insertExitSurveyResponse(
+            client,
+            payload.device_id,
+            payload.exit_survey_response,
+          );
+        }
+
         await client.query("COMMIT");
         return;
       } catch (e2) {
@@ -107,41 +159,53 @@ export async function getCounts(config: DbConfig): Promise<DbCounts> {
     database: config.database,
     user: config.user,
     password: config.password,
-    ssl: config.ssl ? { rejectUnauthorized: false } : undefined
+    ssl: config.ssl ? { rejectUnauthorized: false } : undefined,
   });
 
   await client.connect();
   try {
     await ensureSchema(client);
 
-    const devices = await client.query(`SELECT COUNT(*)::bigint AS c FROM devices`);
-    const sessions = await client.query(`SELECT COUNT(*)::bigint AS c FROM sessions`);
-    const interventions = await client.query(`SELECT COUNT(*)::bigint AS c FROM interventions`);
+    const devices = await client.query(
+      `SELECT COUNT(*)::bigint AS c FROM devices`,
+    );
+    const sessions = await client.query(
+      `SELECT COUNT(*)::bigint AS c FROM sessions`,
+    );
+    const interventions = await client.query(
+      `SELECT COUNT(*)::bigint AS c FROM interventions`,
+    );
     return {
       devices: Number(devices.rows[0]?.c ?? 0),
       sessions: Number(sessions.rows[0]?.c ?? 0),
-      interventions: Number(interventions.rows[0]?.c ?? 0)
+      interventions: Number(interventions.rows[0]?.c ?? 0),
     };
   } finally {
     await client.end();
   }
 }
 
-export async function exportSessionsCsv(config: DbConfig, sinceMs?: number): Promise<string> {
+export async function exportSessionsCsv(
+  config: DbConfig,
+  sinceMs?: number,
+): Promise<string> {
   const client = new Client({
     host: config.host,
     port: config.port,
     database: config.database,
     user: config.user,
     password: config.password,
-    ssl: config.ssl ? { rejectUnauthorized: false } : undefined
+    ssl: config.ssl ? { rejectUnauthorized: false } : undefined,
   });
 
   await client.connect();
   try {
     await ensureSchema(client);
     const params: any[] = [];
-    const where = sinceMs ? (params.push(sinceMs), `WHERE session_start_ts >= to_timestamp($1 / 1000.0)`) : "";
+    const where = sinceMs
+      ? (params.push(sinceMs),
+        `WHERE session_start_ts >= to_timestamp($1 / 1000.0)`)
+      : "";
     const res = await client.query(
       `
       SELECT
@@ -155,7 +219,7 @@ export async function exportSessionsCsv(config: DbConfig, sinceMs?: number): Pro
       ${where}
       ORDER BY session_start_ts DESC
       `,
-      params
+      params,
     );
 
     const header = [
@@ -164,7 +228,7 @@ export async function exportSessionsCsv(config: DbConfig, sinceMs?: number): Pro
       "app_package_name",
       "session_start_ts",
       "session_end_ts",
-      "duration_seconds"
+      "duration_seconds",
     ];
     return toCsv(header, res.rows);
   } finally {
@@ -172,14 +236,17 @@ export async function exportSessionsCsv(config: DbConfig, sinceMs?: number): Pro
   }
 }
 
-export async function exportInterventionsCsv(config: DbConfig, sinceMs?: number): Promise<string> {
+export async function exportInterventionsCsv(
+  config: DbConfig,
+  sinceMs?: number,
+): Promise<string> {
   const client = new Client({
     host: config.host,
     port: config.port,
     database: config.database,
     user: config.user,
     password: config.password,
-    ssl: config.ssl ? { rejectUnauthorized: false } : undefined
+    ssl: config.ssl ? { rejectUnauthorized: false } : undefined,
   });
 
   await client.connect();
@@ -187,7 +254,8 @@ export async function exportInterventionsCsv(config: DbConfig, sinceMs?: number)
     await ensureSchema(client);
     const params: any[] = [];
     const where = sinceMs
-      ? (params.push(sinceMs), `WHERE intervention_start_ts >= to_timestamp($1 / 1000.0)`)
+      ? (params.push(sinceMs),
+        `WHERE intervention_start_ts >= to_timestamp($1 / 1000.0)`)
       : "";
     const res = await client.query(
       `
@@ -195,6 +263,7 @@ export async function exportInterventionsCsv(config: DbConfig, sinceMs?: number)
         intervention_id,
         session_id,
         device_id,
+        intervention_arm,
         milestone_minutes,
         prompt_variant,
         user_action,
@@ -204,23 +273,144 @@ export async function exportInterventionsCsv(config: DbConfig, sinceMs?: number)
       ${where}
       ORDER BY intervention_start_ts DESC
       `,
-      params
+      params,
     );
 
     const header = [
       "intervention_id",
       "session_id",
       "device_id",
+      "intervention_arm",
       "milestone_minutes",
       "prompt_variant",
       "user_action",
       "intervention_start_ts",
-      "intervention_end_ts"
+      "intervention_end_ts",
     ];
     return toCsv(header, res.rows);
   } finally {
     await client.end();
   }
+}
+
+async function insertOnboardingResponse(
+  client: Client,
+  deviceId: string,
+  r: UploadOnboardingResponse,
+): Promise<void> {
+  await client.query(
+    `
+    INSERT INTO onboarding_responses (
+      device_id,
+      onboarding_version,
+      completed_at,
+      trait_1, trait_2, trait_3,
+      goal_1, goal_2, goal_3,
+      role_1, role_2, role_3,
+      automaticity, utility, intention,
+      readiness_reduce_use, willingness_pause_task
+    ) VALUES (
+      $1, $2, to_timestamp($3 / 1000.0),
+      $4, $5, $6,
+      $7, $8, $9,
+      $10, $11, $12,
+      $13, $14, $15,
+      $16, $17
+    )
+    ON CONFLICT (device_id) DO UPDATE SET
+      onboarding_version = EXCLUDED.onboarding_version,
+      completed_at = EXCLUDED.completed_at,
+      trait_1 = EXCLUDED.trait_1,
+      trait_2 = EXCLUDED.trait_2,
+      trait_3 = EXCLUDED.trait_3,
+      goal_1 = EXCLUDED.goal_1,
+      goal_2 = EXCLUDED.goal_2,
+      goal_3 = EXCLUDED.goal_3,
+      role_1 = EXCLUDED.role_1,
+      role_2 = EXCLUDED.role_2,
+      role_3 = EXCLUDED.role_3,
+      automaticity = EXCLUDED.automaticity,
+      utility = EXCLUDED.utility,
+      intention = EXCLUDED.intention,
+      readiness_reduce_use = EXCLUDED.readiness_reduce_use,
+      willingness_pause_task = EXCLUDED.willingness_pause_task
+    `,
+    [
+      deviceId,
+      r.onboarding_version ?? null,
+      r.completed_at ?? null,
+      r.trait_1 ?? null,
+      r.trait_2 ?? null,
+      r.trait_3 ?? null,
+      r.goal_1 ?? null,
+      r.goal_2 ?? null,
+      r.goal_3 ?? null,
+      r.role_1 ?? null,
+      r.role_2 ?? null,
+      r.role_3 ?? null,
+      r.automaticity ?? null,
+      r.utility ?? null,
+      r.intention ?? null,
+      r.readiness_reduce_use ?? null,
+      r.willingness_pause_task ?? null,
+    ],
+  );
+}
+
+async function insertExitSurveyResponse(
+  client: Client,
+  deviceId: string,
+  r: UploadExitSurveyResponse,
+): Promise<void> {
+  await client.query(
+    `
+    INSERT INTO exit_survey_responses (
+      device_id,
+      completed_at,
+      interruption_awareness,
+      decision_influence,
+      helpfulness,
+      frustration,
+      pause_reconsider,
+      easier_to_ignore,
+      outside_use_likelihood,
+      biggest_influence_aspect,
+      own_words_effect,
+      suggestions
+    ) VALUES (
+      $1, to_timestamp($2 / 1000.0),
+      $3, $4, $5, $6,
+      $7, $8, $9,
+      $10, $11, $12
+    )
+    ON CONFLICT (device_id) DO UPDATE SET
+      completed_at = EXCLUDED.completed_at,
+      interruption_awareness = EXCLUDED.interruption_awareness,
+      decision_influence = EXCLUDED.decision_influence,
+      helpfulness = EXCLUDED.helpfulness,
+      frustration = EXCLUDED.frustration,
+      pause_reconsider = EXCLUDED.pause_reconsider,
+      easier_to_ignore = EXCLUDED.easier_to_ignore,
+      outside_use_likelihood = EXCLUDED.outside_use_likelihood,
+      biggest_influence_aspect = EXCLUDED.biggest_influence_aspect,
+      own_words_effect = EXCLUDED.own_words_effect,
+      suggestions = EXCLUDED.suggestions
+    `,
+    [
+      deviceId,
+      r.completed_at ?? null,
+      r.interruption_awareness ?? null,
+      r.decision_influence ?? null,
+      r.helpfulness ?? null,
+      r.frustration ?? null,
+      r.pause_reconsider ?? null,
+      r.easier_to_ignore ?? null,
+      r.outside_use_likelihood ?? null,
+      r.biggest_influence_aspect ?? null,
+      r.own_words_effect ?? null,
+      r.suggestions ?? null,
+    ],
+  );
 }
 
 async function ensureSchema(client: Client): Promise<void> {
@@ -278,8 +468,13 @@ function toCsv(header: string[], rows: Array<Record<string, any>>): string {
 function csvEscape(v: any): string {
   if (v === null || v === undefined) return "";
   const s = String(v);
-  if (s.includes("\"") || s.includes(",") || s.includes("\n") || s.includes("\r")) {
-    return `"${s.replace(/\"/g, "\"\"")}"`;
+  if (
+    s.includes('"') ||
+    s.includes(",") ||
+    s.includes("\n") ||
+    s.includes("\r")
+  ) {
+    return `"${s.replace(/\"/g, '""')}"`;
   }
   return s;
 }
@@ -304,37 +499,41 @@ async function insertSession(client: Client, s: UploadSession): Promise<void> {
       s.app_package_name,
       s.session_start_ts,
       s.session_end_ts ?? null,
-      s.duration_seconds ?? null
-    ]
+      s.duration_seconds ?? null,
+    ],
   );
 }
 
-async function insertIntervention(client: Client, i: UploadIntervention): Promise<void> {
+async function insertIntervention(
+  client: Client,
+  i: UploadIntervention,
+): Promise<void> {
   await client.query(
     `
     INSERT INTO interventions (
       intervention_id,
       device_id,
       session_id,
+      intervention_arm,
       milestone_minutes,
       prompt_variant,
       user_action,
       intervention_start_ts,
       intervention_end_ts,
       created_at
-    ) VALUES ($1, $2, $3, $4, $5, $6, to_timestamp($7 / 1000.0), to_timestamp($8 / 1000.0), NOW())
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, to_timestamp($8 / 1000.0), to_timestamp($9 / 1000.0), NOW())
     ON CONFLICT (intervention_id) DO NOTHING
     `,
     [
       i.intervention_id,
       i.device_id,
       i.session_id,
+      i.intervention_arm,
       i.milestone_minutes,
       i.prompt_variant,
       i.user_action ?? null,
       i.intervention_start_ts,
-      i.intervention_end_ts ?? null
-    ]
+      i.intervention_end_ts ?? null,
+    ],
   );
 }
-

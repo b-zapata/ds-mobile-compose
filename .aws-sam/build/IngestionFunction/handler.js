@@ -5180,7 +5180,6 @@ async function insertUploadPayload(payload, config) {
   });
   await client.connect();
   try {
-    await ensureSchema(client);
     await client.query("BEGIN");
     await client.query(
       `
@@ -5190,6 +5189,12 @@ async function insertUploadPayload(payload, config) {
       `,
       [payload.device_id]
     );
+    if (payload.onboarding_response) {
+      await insertOnboardingResponse(client, payload.device_id, payload.onboarding_response);
+    }
+    if (payload.exit_survey_response) {
+      await insertExitSurveyResponse(client, payload.device_id, payload.exit_survey_response);
+    }
     if (payload.sessions.length > 0) {
       for (const s of payload.sessions) {
         await insertSession(client, s);
@@ -5203,6 +5208,33 @@ async function insertUploadPayload(payload, config) {
     await client.query("COMMIT");
   } catch (e) {
     await client.query("ROLLBACK");
+    if (e?.code === "42P01") {
+      await ensureSchema(client);
+      await client.query("BEGIN");
+      try {
+        await client.query(
+          `
+          INSERT INTO devices (device_id)
+          VALUES ($1)
+          ON CONFLICT (device_id) DO NOTHING
+          `,
+          [payload.device_id]
+        );
+        for (const s of payload.sessions) await insertSession(client, s);
+        for (const i of payload.interventions) await insertIntervention(client, i);
+        if (payload.onboarding_response) {
+          await insertOnboardingResponse(client, payload.device_id, payload.onboarding_response);
+        }
+        if (payload.exit_survey_response) {
+          await insertExitSurveyResponse(client, payload.device_id, payload.exit_survey_response);
+        }
+        await client.query("COMMIT");
+        return;
+      } catch (e2) {
+        await client.query("ROLLBACK");
+        throw e2;
+      }
+    }
     throw e;
   } finally {
     await client.end();
@@ -5319,6 +5351,110 @@ async function exportInterventionsCsv(config, sinceMs) {
   } finally {
     await client.end();
   }
+}
+async function insertOnboardingResponse(client, deviceId, r) {
+  await client.query(
+    `
+    INSERT INTO onboarding_responses (
+      device_id,
+      onboarding_version,
+      completed_at,
+      trait_1, trait_2, trait_3,
+      goal_1, goal_2, goal_3,
+      role_1, role_2, role_3,
+      automaticity, utility, intention
+    ) VALUES (
+      $1, $2, to_timestamp($3 / 1000.0),
+      $4, $5, $6,
+      $7, $8, $9,
+      $10, $11, $12,
+      $13, $14, $15
+    )
+    ON CONFLICT (device_id) DO UPDATE SET
+      onboarding_version = EXCLUDED.onboarding_version,
+      completed_at = EXCLUDED.completed_at,
+      trait_1 = EXCLUDED.trait_1,
+      trait_2 = EXCLUDED.trait_2,
+      trait_3 = EXCLUDED.trait_3,
+      goal_1 = EXCLUDED.goal_1,
+      goal_2 = EXCLUDED.goal_2,
+      goal_3 = EXCLUDED.goal_3,
+      role_1 = EXCLUDED.role_1,
+      role_2 = EXCLUDED.role_2,
+      role_3 = EXCLUDED.role_3,
+      automaticity = EXCLUDED.automaticity,
+      utility = EXCLUDED.utility,
+      intention = EXCLUDED.intention
+    `,
+    [
+      deviceId,
+      r.onboarding_version ?? null,
+      r.completed_at ?? null,
+      r.trait_1 ?? null,
+      r.trait_2 ?? null,
+      r.trait_3 ?? null,
+      r.goal_1 ?? null,
+      r.goal_2 ?? null,
+      r.goal_3 ?? null,
+      r.role_1 ?? null,
+      r.role_2 ?? null,
+      r.role_3 ?? null,
+      r.automaticity ?? null,
+      r.utility ?? null,
+      r.intention ?? null
+    ]
+  );
+}
+async function insertExitSurveyResponse(client, deviceId, r) {
+  await client.query(
+    `
+    INSERT INTO exit_survey_responses (
+      device_id,
+      completed_at,
+      interruption_awareness,
+      decision_influence,
+      helpfulness,
+      frustration,
+      pause_reconsider,
+      easier_to_ignore,
+      outside_use_likelihood,
+      biggest_influence_aspect,
+      own_words_effect,
+      suggestions
+    ) VALUES (
+      $1, to_timestamp($2 / 1000.0),
+      $3, $4, $5, $6,
+      $7, $8, $9,
+      $10, $11, $12
+    )
+    ON CONFLICT (device_id) DO UPDATE SET
+      completed_at = EXCLUDED.completed_at,
+      interruption_awareness = EXCLUDED.interruption_awareness,
+      decision_influence = EXCLUDED.decision_influence,
+      helpfulness = EXCLUDED.helpfulness,
+      frustration = EXCLUDED.frustration,
+      pause_reconsider = EXCLUDED.pause_reconsider,
+      easier_to_ignore = EXCLUDED.easier_to_ignore,
+      outside_use_likelihood = EXCLUDED.outside_use_likelihood,
+      biggest_influence_aspect = EXCLUDED.biggest_influence_aspect,
+      own_words_effect = EXCLUDED.own_words_effect,
+      suggestions = EXCLUDED.suggestions
+    `,
+    [
+      deviceId,
+      r.completed_at ?? null,
+      r.interruption_awareness ?? null,
+      r.decision_influence ?? null,
+      r.helpfulness ?? null,
+      r.frustration ?? null,
+      r.pause_reconsider ?? null,
+      r.easier_to_ignore ?? null,
+      r.outside_use_likelihood ?? null,
+      r.biggest_influence_aspect ?? null,
+      r.own_words_effect ?? null,
+      r.suggestions ?? null
+    ]
+  );
 }
 async function ensureSchema(client) {
   await client.query(`
@@ -5511,6 +5647,73 @@ function validateIntervention(v) {
   };
   return { ok: true, value: intervention };
 }
+function validateOnboardingResponse(v) {
+  if (!isRecord(v)) return { ok: false, message: "onboarding_response must be an object" };
+  const r = v;
+  const getNullableString = (key) => {
+    if (!(key in r) || r[key] === void 0 || r[key] === null) return null;
+    if (!isString(r[key])) throw new Error(`Invalid onboarding_response.${key}`);
+    return r[key];
+  };
+  const getNullableNumber = (key) => {
+    if (!(key in r) || r[key] === void 0 || r[key] === null) return null;
+    if (!isNumber(r[key])) throw new Error(`Invalid onboarding_response.${key}`);
+    return r[key];
+  };
+  try {
+    const onboarding = {
+      onboarding_version: getNullableString("onboarding_version"),
+      completed_at: getNullableNumber("completed_at"),
+      trait_1: getNullableString("trait_1"),
+      trait_2: getNullableString("trait_2"),
+      trait_3: getNullableString("trait_3"),
+      goal_1: getNullableString("goal_1"),
+      goal_2: getNullableString("goal_2"),
+      goal_3: getNullableString("goal_3"),
+      role_1: getNullableString("role_1"),
+      role_2: getNullableString("role_2"),
+      role_3: getNullableString("role_3"),
+      automaticity: getNullableNumber("automaticity"),
+      utility: getNullableNumber("utility"),
+      intention: getNullableNumber("intention")
+    };
+    return { ok: true, value: onboarding };
+  } catch (e) {
+    return { ok: false, message: `onboarding_response invalid: ${e?.message ?? String(e)}` };
+  }
+}
+function validateExitSurveyResponse(v) {
+  if (!isRecord(v)) return { ok: false, message: "exit_survey_response must be an object" };
+  const r = v;
+  const getNullableString = (key) => {
+    if (!(key in r) || r[key] === void 0 || r[key] === null) return null;
+    if (!isString(r[key])) throw new Error(`Invalid exit_survey_response.${key}`);
+    return r[key];
+  };
+  const getNullableNumber = (key) => {
+    if (!(key in r) || r[key] === void 0 || r[key] === null) return null;
+    if (!isNumber(r[key])) throw new Error(`Invalid exit_survey_response.${key}`);
+    return r[key];
+  };
+  try {
+    const exit = {
+      completed_at: getNullableNumber("completed_at"),
+      interruption_awareness: getNullableNumber("interruption_awareness"),
+      decision_influence: getNullableNumber("decision_influence"),
+      helpfulness: getNullableNumber("helpfulness"),
+      frustration: getNullableNumber("frustration"),
+      pause_reconsider: getNullableNumber("pause_reconsider"),
+      easier_to_ignore: getNullableNumber("easier_to_ignore"),
+      outside_use_likelihood: getNullableNumber("outside_use_likelihood"),
+      biggest_influence_aspect: getNullableString("biggest_influence_aspect"),
+      own_words_effect: getNullableString("own_words_effect"),
+      suggestions: getNullableString("suggestions")
+    };
+    return { ok: true, value: exit };
+  } catch (e) {
+    return { ok: false, message: `exit_survey_response invalid: ${e?.message ?? String(e)}` };
+  }
+}
 function validatePayload(body) {
   if (!isRecord(body)) return { ok: false, message: "body must be an object" };
   if (!("device_id" in body) || !isString(body.device_id)) {
@@ -5534,12 +5737,36 @@ function validatePayload(body) {
     if (!res.ok) return res;
     interventions.push(res.value);
   }
+  let onboarding_response = void 0;
+  if ("onboarding_response" in body) {
+    const raw = body.onboarding_response;
+    if (raw === null || raw === void 0) {
+      onboarding_response = null;
+    } else {
+      const res = validateOnboardingResponse(raw);
+      if (!res.ok) return res;
+      onboarding_response = res.value;
+    }
+  }
+  let exit_survey_response = void 0;
+  if ("exit_survey_response" in body) {
+    const raw = body.exit_survey_response;
+    if (raw === null || raw === void 0) {
+      exit_survey_response = null;
+    } else {
+      const res = validateExitSurveyResponse(raw);
+      if (!res.ok) return res;
+      exit_survey_response = res.value;
+    }
+  }
   return {
     ok: true,
     value: {
       device_id: body.device_id,
       sessions,
-      interventions
+      interventions,
+      onboarding_response,
+      exit_survey_response
     }
   };
 }
