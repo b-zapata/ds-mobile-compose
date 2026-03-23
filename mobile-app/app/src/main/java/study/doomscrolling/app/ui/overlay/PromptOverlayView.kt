@@ -2,6 +2,7 @@ package study.doomscrolling.app.ui.overlay
 
 import android.content.Intent
 import android.os.CountDownTimer
+import android.util.Log
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -74,7 +75,7 @@ fun PromptOverlayView(
                     .fillMaxSize()
                     .statusBarsPadding()
                     .navigationBarsPadding()
-                    .padding(40.dp),
+                    .padding(horizontal = 40.dp, vertical = 24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
@@ -93,7 +94,10 @@ fun PromptOverlayView(
 
                 // Mode-based interaction
                 if (studyArm == StudyArm.FRICTION) {
-                    FrictionTaskFactory(promptText = promptText, onTaskComplete = onContinue)
+                    FrictionTaskFactory(
+                        promptText = promptText, 
+                        onTaskComplete = onContinue
+                    )
                 } else {
                     StandardTask(
                         isFinished = isTimerFinished,
@@ -164,23 +168,56 @@ private fun StandardTask(
 private fun FrictionTaskFactory(promptText: String, onTaskComplete: () -> Unit) {
     val text = promptText.uppercase()
     when {
-        text.contains("TYPE") -> {
-            val target = promptText.substringAfter("'").substringBefore("'")
+        // 1. Sequence Tap Task: "Tap the sequence '...' backwards"
+        text.contains("SEQUENCE") && text.contains("BACKWARDS") && text.contains("TAP") -> {
+            val sequence = promptText.substringAfter("'").substringBefore("'")
+            val targetDigits = sequence.filter { it.isDigit() }.reversed()
+            SequencingTask(customSequence = targetDigits, onComplete = onTaskComplete)
+        }
+        // 2. Backwards Typing: "Type the word '...' backwards"
+        text.contains("BACKWARDS") -> {
+            val word = promptText.substringAfter("'").substringBefore("'")
+            val target = word.reversed()
+            Log.d("Friction", "Reverse Task -> Target: $target")
             TypingTask(target = target, onComplete = onTaskComplete)
         }
-        text.contains("HOLD") -> {
-            val seconds = promptText.filter { it.isDigit() }.toIntOrNull() ?: 10
-            HoldingTask(seconds = seconds, onComplete = onTaskComplete)
+        // 3. Math Task: "Type the answer to '...'"
+        text.contains("ANSWER") -> {
+            val target = calculateMathAnswer(promptText)
+            Log.d("Friction", "Math Task -> Target: $target")
+            TypingTask(target = target, onComplete = onTaskComplete)
         }
+        // 4. Sequencing Task: "Tap the numbers..."
         text.contains("NUMBERS") -> {
             val isReverse = text.contains("REVERSE")
-            SequencingTask(isReverse = isReverse, onComplete = onTaskComplete)
+            Log.d("Friction", "Sequence Task -> Reverse: $isReverse")
+            SequencingTask(customSequence = if (isReverse) "987654321" else "123456789", onComplete = onTaskComplete)
+        }
+        // 5. Default Typing: "Type the code '...'" or "Type the phrase '...'"
+        text.contains("TYPE") -> {
+            val target = promptText.substringAfter("'").substringBefore("'")
+            Log.d("Friction", "Direct Type Task -> Target: $target")
+            TypingTask(target = target, onComplete = onTaskComplete)
         }
         else -> {
-            // Fallback to a simple wait if parsing fails
             StandardTask(isFinished = true, secondsLeft = 0, onContinue = onTaskComplete)
         }
     }
+}
+
+private fun calculateMathAnswer(prompt: String): String {
+    val mathExpression = prompt.substringAfter("'").substringBefore("'")
+    val numbers = Regex("(\\d+)").findAll(mathExpression).map { it.value.toInt() }.toList()
+    
+    if (numbers.size < 2) return "0"
+    
+    val result = when {
+        mathExpression.contains("+") -> numbers[0] + numbers[1]
+        mathExpression.contains("-") -> numbers[0] - numbers[1]
+        mathExpression.uppercase().contains("TIMES") -> numbers[0] * numbers[1]
+        else -> 0
+    }
+    return result.toString()
 }
 
 @Composable
@@ -194,7 +231,7 @@ private fun TypingTask(target: String, onComplete: () -> Unit) {
             onValueChange = { input = it },
             modifier = Modifier.fillMaxWidth(),
             textStyle = LocalTextStyle.current.copy(textAlign = TextAlign.Center, color = Color.White),
-            placeholder = { Text("Type here...", modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center) },
+            placeholder = { Text("Type answer...", modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center) },
             singleLine = true,
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = Color.White,
@@ -212,102 +249,58 @@ private fun TypingTask(target: String, onComplete: () -> Unit) {
 }
 
 @Composable
-private fun HoldingTask(seconds: Int, onComplete: () -> Unit) {
-    var progress by remember { mutableFloatStateOf(0f) }
-    var isHolding by remember { mutableStateOf(false) }
-    val totalMs = seconds * 1000L
-
-    DisposableEffect(isHolding) {
-        var timer: CountDownTimer? = null
-        if (isHolding) {
-            timer = object : CountDownTimer(totalMs, 50) {
-                override fun onTick(millisUntilFinished: Long) {
-                    progress = (totalMs - millisUntilFinished).toFloat() / totalMs
-                }
-                override fun onFinish() {
-                    progress = 1f
-                    onComplete()
-                }
-            }.start()
-        } else {
-            progress = 0f
-        }
-        onDispose { timer?.cancel() }
+private fun SequencingTask(customSequence: String, onComplete: () -> Unit) {
+    val targetDigits = customSequence.map { it.toString() }
+    val gridDigits = remember(customSequence) { 
+        (0..9).map { it.toString() }.shuffled() 
     }
+    
+    var currentStep by remember { mutableIntStateOf(0) }
 
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        LinearProgressIndicator(
-            progress = progress,
-            modifier = Modifier.fillMaxWidth().height(8.dp),
-            color = Color.White,
-            trackColor = Color.White.copy(alpha = 0.2f)
-        )
-        Spacer(modifier = Modifier.height(24.dp))
-        Button(
-            onClick = {}, // Handled via pointerInput
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(80.dp)
-                .pointerInput(Unit) {
-                    awaitPointerEventScope {
-                        while (true) {
-                            val event = awaitPointerEvent()
-                            isHolding = event.changes.any { it.pressed }
-                        }
-                    }
-                },
-            shape = RectangleShape,
-            colors = ButtonDefaults.buttonColors(
-                containerColor = if (isHolding) Color.White else Color.Transparent,
-                contentColor = if (isHolding) Color.Black else Color.White
-            ),
-            border = BorderStroke(1.dp, Color.White)
-        ) {
-            Text(if (isHolding) "HOLDING..." else "PRESS AND HOLD", fontWeight = FontWeight.Bold)
-        }
-    }
-}
-
-@Composable
-private fun SequencingTask(isReverse: Boolean, onComplete: () -> Unit) {
-    val numbers = remember { (1..9).toList().shuffled() }
-    var nextTarget by remember { mutableIntStateOf(if (isReverse) 9 else 1) }
-    val completed = remember { mutableStateListOf<Int>() }
-
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        // Research-backed change: Don't reveal the target sequence characters after the current step.
+        // The user must actually remember/calculate the backward sequence from the prompt text.
         Text(
-            text = if (isReverse) "TAP 9 TO 1" else "TAP 1 TO 9",
-            style = MaterialTheme.typography.labelMedium,
-            color = Color.White.copy(alpha = 0.6f)
+            text = "TARGET: ${customSequence.mapIndexed { i, _ -> if (i < currentStep) "✓" else "?" }.joinToString(" ")}",
+            style = MaterialTheme.typography.labelLarge.copy(letterSpacing = 2.sp),
+            color = Color.White
         )
         Spacer(modifier = Modifier.height(24.dp))
+        
         LazyVerticalGrid(
             columns = GridCells.Fixed(3),
-            modifier = Modifier.size(240.dp),
+            modifier = Modifier.width(240.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            items(numbers) { num ->
-                val isDone = completed.contains(num)
+            items(gridDigits) { digit ->
+                val isNext = currentStep < targetDigits.size && digit == targetDigits[currentStep]
+                
                 OutlinedButton(
                     onClick = {
-                        if (num == nextTarget) {
-                            completed.add(num)
-                            if (isReverse) nextTarget-- else nextTarget++
-                            if (completed.size == 9) onComplete()
+                        if (isNext) {
+                            currentStep++
+                            if (currentStep == targetDigits.size) onComplete()
+                        } else {
+                            // Penalty: Reset on wrong tap
+                            currentStep = 0
                         }
                     },
                     modifier = Modifier.aspectRatio(1f),
                     shape = RectangleShape,
-                    border = BorderStroke(1.dp, if (isDone) Color.Gray else Color.White),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = if (isDone) Color.Gray else Color.White
-                    ),
-                    enabled = !isDone
+                    border = BorderStroke(1.dp, Color.White),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
                 ) {
-                    Text(text = num.toString(), fontSize = 20.sp)
+                    Text(text = digit, fontSize = 20.sp)
                 }
             }
         }
+        
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = "Step $currentStep of ${targetDigits.size}",
+            style = MaterialTheme.typography.labelSmall,
+            color = Color.White.copy(alpha = 0.5f)
+        )
     }
 }

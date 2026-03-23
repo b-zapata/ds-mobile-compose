@@ -39,7 +39,7 @@ class UsageTrackingService : Service() {
     private val studyArmManager by lazy { StudyArmManager(db.deviceDao()) }
     private val promptRenderer by lazy { PromptRenderer() }
     private val promptRepository by lazy { PromptRepository(applicationContext) }
-    private val promptEngine by lazy { PromptEngine(promptRepository, promptRenderer) }
+    private val promptEngine by lazy { PromptEngine(promptRepository, promptRenderer, db.interventionDao()) }
     private val promptManager by lazy { PromptManager(applicationContext) }
     private val interventionEngine by lazy {
         InterventionEngine(

@@ -1,74 +1,93 @@
 {
-  "identity": {
-    "0": [
-      "Take a breath and remember your trait of '[Trait 1]'. Is this scroll aligned with that part of you?",
-      "Think about your goal of '[Goal 1]'. Does staying here help you move toward it?"
-    ],
-    "2": [
-      "You've been here for a while. Someone with your trait of '[Trait 2]' might choose differently right now.",
-      "If you lived fully as your role of '[Role 1]' today, what would you do next instead of scrolling?"
-    ],
-    "5": [
-      "Picture the version of you who truly embodies your trait of '[Trait 3]'. What would they do now?",
-      "Is this helping you be the kind of '[Role 2]' you want to be?"
-    ],
-    "10": [
-      "Long scrolls can pull you away from your passion for '[Goal 2]'. Is there a small step toward it you can take now?",
-      "Imagine looking back tonight as your role of '[Role 3]'. How do you wish you had spent this time?"
-    ]
-  },
-  "mindfulness": {
-    "0": [
-      "Notice your body. Where do you feel tension right now?",
-      "Gently bring your attention to your breath. Follow three full inhales and exhales."
-    ],
-    "2": [
-      "Imagine you are in a calming, quiet place. Let that scene fill your mind for a few moments.",
-      "Visualize a restful, quiet color slowly filling the screen and softening your attention."
-    ],
-    "5": [
-      "Pause and imagine feeling a soothing texture. Stay with it for three breaths.",
-      "Notice the pull to keep scrolling. Can you rest your attention on your body instead, just for a moment?"
-    ],
-    "10": [
-      "Feel the weight of your body holding you in place, not the feed.",
-      "Bring awareness to your body—how both sides of your body rest right now."
-    ]
-  },
-  "friction": {
-    "0": [
-      "Entry tax: Type the word 'PAUSE' to continue.",
-      "Requirement: Type the word 'INTENTION' to begin this session."
-    ],
-    "2": [
-      "Friction check: Type the code 'B4K9Z2' to proceed.",
-      "Requirement: Type the word 'REFLECTION' to stay in the app."
-    ],
-    "5": [
-      "Physical stasis: Press and hold the button below for 12 seconds.",
-      "Requirement: Maintain a continuous hold for 10 seconds to unlock."
-    ],
-    "10": [
-      "Cognitive search: Tap the numbers 1 through 9 in reverse order.",
-      "Logic check: Tap the scrambled numbers below in ascending order."
-    ]
-  },
-  "blank": {
-    "0": [
-      "Take a brief pause. Do you want to keep scrolling right now?",
-      "Notice how you feel in this moment before continuing."
-    ],
-    "2": [
-      "You’ve been here for a while. Is this how you want to spend the next few minutes?",
-      "Check in: Are you scrolling with intention or out of habit?"
-    ],
-    "5": [
-      "Imagine what else you could do with the next 10 minutes. Does anything sound better than this feed?",
-      "Would a short break from the screen feel helpful right now?"
-    ],
-    "10": [
-      "Long sessions can blur together. Is now a good time to step away for a bit?",
-      "If you paused now, what small, restful action could you take instead?"
-    ]
-  }
+  "identity": [
+    "Is opening this app right now consistent with being a '[Trait 1]' person?",
+    "You said you admire '[Trait 2]'. What would a person with this trait do right now?",
+    "You're working on being more '[Trait 3]'. Would using this app help you develop that trait?",
+    "If you were acting as your most '[Trait 1]' self, what would you do after this timer ends?",
+    "Does a '[Trait 2]' person let an algorithm choose how they spend their afternoon?",
+    "Will the next 15 minutes move you closer to '[Goal 1]', or further away?",
+    "Is this feed more important than making progress on your goal of '[Goal 2]'?",
+    "Think of your dream: '[Goal 3]'. Does this habit support the version of you who achieves that?",
+    "You want to reach '[Goal 1]'. Use this pause to decide if this app helps.",
+    "Is the dopamine from this scroll worth delaying your progress on '[Goal 2]'?",
+    "You take pride in being a '[Role 1]'. Is this how a great '[Role 1]' spends their free time?",
+    "As a '[Role 2]', your focus is your greatest asset. Don't give it away for free.",
+    "As a '[Role 3]', is there a better way to spend this time that feeds your passion?",
+    "Imagine the person who relies on you as a '[Role 1]'. What behavior are you modeling for them?",
+    "Does your identity as a '[Role 2]' require more presence than you're giving right now?",
+    "Is this session serving your milestone of '[Goal 1]'?",
+    "You are a '[Role 2]' first, and a consumer second. Which one are you acting as now?",
+    "You want to develop '[Trait 3]'. Use this pause to demonstrate it to yourself.",
+    "Every minute here is a minute taken from '[Goal 2]'. Which is more important?",
+    "If those who see you as a '[Role 1]' saw your screen right now, would you be proud?",
+    "Does this path lead to '[Goal 3]', or away from it?",
+    "Would the '[Trait 1]' version of you continue this session for another 15 minutes?",
+    "You identify as a '[Role 3]'. Is there a more fulfilling way to engage your mind?",
+    "You admire '[Trait 2]'. Reclaim your focus and embody that quality now.",
+    "Was the content of the last 15 minutes worth the delay to '[Goal 1]'?",
+    "You have a dream: '[Goal 3]'. This app is not that dream.",
+    "Is this the standard of focus a '[Role 2]' sets for themselves?",
+    "You are a '[Trait 1]' person. Act with intention. Close the app.",
+    "Is this scroll more valuable than your progress on '[Goal 1]'? Decide now.",
+    "Break the cycle. Be present for those who see you as a '[Role 1]'"
+  ],
+  "mindfulness": [
+    "Focus on your shoulders. As you exhale, imagine the tension melting away.",
+    "Notice your jaw. Is it tight or relaxed? Just focus on it for 12 seconds.",
+    "Direct all awareness to your breath. Feel the air enter and leave your lungs.",
+    "Take one deep breath. Try to feel the oxygen reach your stomach and soften it.",
+    "Check your hands. If they're clenched, release them now and notice the shift.",
+    "Focus on the feeling of your feet on the floor. Feel the earth holding you steady.",
+    "Find the sensation of your heartbeat. Feel it without moving.",
+    "Direct your focus to both of your arms at once. Balance your awareness.",
+    "Imagine you are running your hand over a smooth stone. Feel the texture in your mind.",
+    "Direct 100% of your awareness to the weight of your phone in your hand.",
+    "Close your eyes and visualize a field of pure, calm blue. Keep it steady.",
+    "Visualize yourself in a quiet forest. Engage your senses: what do you see and hear?",
+    "Fill your mind with the color white. Let it be the only thing you see for 12s.",
+    "In your mind's eye, recall the sensation of cool water on your face.",
+    "Transport yourself to a mountain peak. Take a deep breath of the cold air.",
+    "Scan your neck and back. Is the tension there higher now than when you started?",
+    "Break the trance: Find the sensation in your toes. Shift focus to your body.",
+    "Close your eyes. Visualize a restful green to clear the digital noise.",
+    "Put the phone down. Imagine the feeling of a warm breeze against your skin.",
+    "Scan your posture. Is your weight balanced or shifted to one side?",
+    "Breathe deeply. Notice the sensation of being alive right now.",
+    "Check your breathing. Consciously slow it down for 12 seconds.",
+    "Focus on your whole body at once. Re-center by feeling your physical presence.",
+    "Visualization: You are on a quiet beach. The screen is gone. Stay there.",
+    "Find your pulse in your wrist. Can you feel it without moving a finger?",
+    "Your brain is in a loop. Scan your chest. Exhale the digital fog.",
+    "Recall the texture of tree bark. Let the real world pull you out of the screen.",
+    "Transport yourself to a library. This is your final grounding for this session.",
+    "Reconnect to the room around you. Notice three objects you can see.",
+    "Visualize a soft golden light. This is the final reset. Reclaim your focus."
+  ],
+  "friction": [
+    "Type the code 'XJ9-4K2-L7P' to proceed.",
+    "Type the word 'HABITUALIZATION' backwards to continue.",
+    "Type the phrase 'INTENTION OVER HABIT' to begin.",
+    "Type the answer to '45 + 38' to stay.",
+    "Type the code '7H3-QU1CK-BR0WN-F0X' to proceed.",
+    "Type the word 'CONSCIOUSNESS' backwards to stay.",
+    "Type the phrase 'REFLECT BEFORE SCROLLING' to continue.",
+    "Type the answer to '92 - 45' to proceed.",
+    "Type the code 'QM-982-ZXC-11' to begin.",
+    "Type the phrase 'MY TIME IS VALUABLE' to stay.",
+    "Type the word 'RECALIBRATION' backwards to continue.",
+    "Type the answer to '14 times 6' to stay.",
+    "Type the code '4-8-15-16-23-42' to proceed.",
+    "Type the phrase 'CHOOSE TO BE PRESENT' to begin.",
+    "Type the word 'PROCRASTINATION' backwards to stay.",
+    "Tap the sequence '8-2-5-1-9-3-6-4-7' backwards.",
+    "Tap the sequence '4-9-3-0-2-8-5-1-6' backwards.",
+    "Tap the sequence '1-7-4-6-9-2-0-3-5' backwards.",
+    "Tap the sequence '3-9-2-8-1-5-7-0-4' backwards.",
+    "Tap the sequence '6-0-2-9-4-1-8-3-5' backwards.",
+    "Tap the numbers 1 through 9 in reverse order.",
+    "Tap the scrambled numbers below in ascending order."
+  ],
+  "control": [
+    "Blank pause."
+  ]
 }

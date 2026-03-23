@@ -41,6 +41,10 @@ class InterventionEngine(
     @Volatile
     private var isHeadsUpActive: Boolean = false
 
+    // Store the arm for the duration of the current session
+    @Volatile
+    private var currentSessionArm: StudyArm? = null
+
     init {
         createNotificationChannels()
     }
@@ -52,6 +56,11 @@ class InterventionEngine(
      */
     fun startMonitoring(sessionId: String, packageName: String, sessionStartMs: Long) {
         stopMonitoring()
+        
+        // Assign a single arm for this entire session
+        currentSessionArm = studyArmManager.getRandomArm()
+        Log.i(TAG, "Session started with arm: $currentSessionArm")
+
         monitoringJob = scope.launch {
             Log.i(TAG, "Intervention scheduler started")
             InterventionScheduler.schedule(this, sessionId, sessionStartMs, this@InterventionEngine).join()
@@ -65,6 +74,7 @@ class InterventionEngine(
         monitoringJob?.cancel()
         monitoringJob = null
         isHeadsUpActive = false
+        currentSessionArm = null // Reset arm
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         nm.cancel(SOFT_WARNING_NOTIFICATION_ID)
         nm.cancel(HEADS_UP_NOTIFICATION_ID)
@@ -157,8 +167,8 @@ class InterventionEngine(
             return
         }
 
-        // DEBUG: Force FRICTION arm for all interventions
-        val studyArm = StudyArm.FRICTION
+        // Use the arm that was assigned when the session started
+        val studyArm = currentSessionArm ?: studyArmManager.getRandomArm()
         val milestoneMinutes = checkpointMinutes ?: 0
 
         val personalization = if (studyArm == StudyArm.IDENTITY) {

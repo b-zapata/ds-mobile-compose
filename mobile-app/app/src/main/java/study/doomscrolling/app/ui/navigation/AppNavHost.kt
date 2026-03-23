@@ -16,6 +16,7 @@ object AppDestinations {
     const val EXIT_SURVEY = "exit_survey"
     const val DASHBOARD = "dashboard"
     const val BASELINE_STATS = "baseline_stats"
+    const val PROMPT_TEST = "prompt_test"
 }
 
 @Composable
@@ -63,12 +64,23 @@ fun AppNavHost(
                     if (BuildConfig.DEBUG) {
                         navController.navigate(AppDestinations.BASELINE_STATS)
                     }
+                },
+                onOpenPromptTest = {
+                    if (BuildConfig.DEBUG) {
+                        navController.navigate(AppDestinations.PROMPT_TEST)
+                    }
                 }
             )
         }
         if (BuildConfig.DEBUG) {
             composable(AppDestinations.BASELINE_STATS) {
+                // Removed onBack to match your current BaselineStatsScreen version
                 BaselineStatsScreen()
+            }
+            composable(AppDestinations.PROMPT_TEST) {
+                PromptTestScreen(
+                    onBack = { navController.popBackStack() }
+                )
             }
         }
     }

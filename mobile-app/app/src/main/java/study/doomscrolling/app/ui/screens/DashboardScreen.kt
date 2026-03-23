@@ -35,7 +35,8 @@ fun DashboardScreen(
     onNavigateToEligibility: () -> Unit = {},
     onNavigateToOnboarding: () -> Unit = {},
     onNavigateToExitSurvey: () -> Unit = {},
-    onOpenBaselineStats: () -> Unit = {}
+    onOpenBaselineStats: () -> Unit = {},
+    onOpenPromptTest: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val db = remember { AppDatabase.getInstance(context) }
@@ -164,6 +165,9 @@ fun DashboardScreen(
                 ) {
                     Button(onClick = onOpenBaselineStats, modifier = Modifier.weight(1f)) {
                         Text("Stats")
+                    }
+                    Button(onClick = onOpenPromptTest, modifier = Modifier.weight(1f)) {
+                        Text("Prompts")
                     }
                     Button(
                         onClick = {
