@@ -19,6 +19,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import study.doomscrolling.app.BuildConfig
 import study.doomscrolling.app.data.database.AppDatabase
@@ -85,22 +86,32 @@ fun DashboardScreen(
     }
 
     // Refresh states from System and handle countdown
-    LaunchedEffect(device) {
+    LaunchedEffect(device?.enrolledAt) {
         hasPermissions = ForegroundAppDetector.hasUsageStatsPermission(context) &&
                 Settings.canDrawOverlays(context)
         
         val enrolledAt = device?.enrolledAt
-        if (enrolledAt != null) {
+        if (enrolledAt == null) {
+            studyCompleted = false
+            timeRemainingText = null
+            return@LaunchedEffect
+        }
+
+        val endAt = StudyWindow.studyEndAt(enrolledAt) ?: enrolledAt
+        while (true) {
             val now = System.currentTimeMillis()
-            val endAt = StudyWindow.studyEndAt(enrolledAt) ?: enrolledAt
             studyCompleted = now >= endAt
-            
-            if (!studyCompleted) {
-                val diff = endAt - now
-                val hours = (diff / (60 * 60 * 1000)) % 24
-                val minutes = (diff / (60 * 1000)) % 60
-                timeRemainingText = "$hours hours, $minutes minutes remaining"
+
+            if (studyCompleted) {
+                timeRemainingText = null
+                break
             }
+
+            val diff = endAt - now
+            val hours = (diff / (60 * 60 * 1000)) % 24
+            val minutes = (diff / (60 * 1000)) % 60
+            timeRemainingText = "$hours hours, $minutes minutes remaining"
+            delay(1000)
         }
     }
 

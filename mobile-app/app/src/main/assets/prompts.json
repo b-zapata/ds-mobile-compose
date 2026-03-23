@@ -87,7 +87,5 @@
     "Tap the numbers 1 through 9 in reverse order.",
     "Tap the scrambled numbers below in ascending order."
   ],
-  "control": [
-    "Blank pause."
-  ]
+  "control": ["Blank pause."]
 }
